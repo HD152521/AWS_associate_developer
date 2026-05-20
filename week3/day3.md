@@ -115,6 +115,92 @@ def lambda_handler(event, context):
 
 ---
 
+## 🧠 알아두면 좋은 심화 이론
+
+### 환경 변수 vs Parameter Store vs Secrets Manager (가장 자주 출제)
+
+| 항목 | 환경 변수 | Parameter Store | Secrets Manager |
+|------|----------|-----------------|-----------------|
+| 비용 | 무료 | 기본 무료 (Advanced는 유료) | 시크릿당 $0.40/월 |
+| 자동 로테이션 | ❌ | ❌ | ✅ |
+| 버전 관리 | ❌ | ✅ | ✅ |
+| 크기 한도 | 4KB 전체 | Standard 4KB / Advanced 8KB | 64KB |
+| 캐싱 | 자동 (글로벌 변수) | Lambda Extension 필요 | Lambda Extension 필요 |
+| 사용 | 비밀이 아닌 설정 | 설정 + 가벼운 비밀 | DB 자격 증명·API 키 |
+
+> 💡 시험 시나리오:
+> - "DB 비밀번호 자동 교체" → **Secrets Manager**
+> - "함수에 환경 분기 (dev/prod)" → **환경 변수** + 별칭
+> - "여러 함수가 같은 설정 공유 + 비용 최소화" → **Parameter Store**
+
+### AWS Parameters and Secrets Lambda Extension (시험 가끔)
+
+```
+첫 호출 → Extension이 Secrets Manager에서 가져옴 → /opt 캐시
+이후 호출 → 캐시에서 즉시 반환 (API 호출 없음)
+TTL 만료 시 자동 갱신
+```
+
+`http://localhost:2773/secretsmanager/get?secretId=xxx` 로 호출 → 호출량 감소 + 콜드 스타트 영향 ↓.
+
+### Lambda 레이어 추가 디테일
+
+- 레이어 자체에도 **버전 번호** 존재 → 함수는 특정 버전 지정 (`...:layer-name:3`)
+- **삭제된 레이어 버전**도 기존 함수에서는 계속 동작 (이미 다운로드됨)
+- 레이어 권한: `lambda:GetLayerVersion`을 다른 계정에 부여하여 공유
+- 레이어 경로: Python은 `/opt/python` 또는 `/opt/python/lib/python<X.Y>/site-packages`
+
+### 버전·별칭·트래픽 시프트 - 상세
+
+```bash
+# 가중치 라우팅: 별칭 "prod"가 버전 1(90%) + 버전 2(10%)
+aws lambda create-alias \
+  --function-name f \
+  --name prod \
+  --function-version 1 \
+  --routing-config 'AdditionalVersionWeights={"2"=0.1}'
+```
+
+> ⚠️ **함정**: 가중치 라우팅은 **2개 버전만** 지정 가능. 3개 이상 불가.
+
+### CodeDeploy를 통한 Lambda 자동 배포 (시험 출제)
+
+| 배포 전략 | 트래픽 전환 패턴 |
+|----------|------------------|
+| **Canary10Percent5Minutes** | 10% → 5분 후 100% |
+| **Canary10Percent30Minutes** | 10% → 30분 후 100% |
+| **Linear10PercentEvery1Minute** | 1분마다 10%씩 |
+| **Linear10PercentEvery10Minutes** | 10분마다 10%씩 |
+| **AllAtOnce** | 즉시 100% |
+
+CloudWatch 경보와 연계 → 알람 발생 시 자동 롤백.
+
+### 환경 변수 키 정책 (KMS 시나리오)
+
+- 기본: AWS 관리 키 `aws/lambda` (계정 내 다른 함수도 복호화 가능)
+- 권장: 고객 관리 KMS 키 (CMK) — 함수별·팀별 격리
+- 시험 출제: "다른 팀이 내 Lambda 환경 변수를 볼 수 없게 하려면?" → 고객 관리 키 + 키 정책
+
+### Lambda Powertools (Python/Java/.NET/TypeScript) - 실무 표준
+
+- **Logger**: 구조화 로깅 (CloudWatch Logs Insights 친화)
+- **Tracer**: X-Ray 자동 통합
+- **Metrics**: EMF(Embedded Metric Format) 자동
+- **Idempotency**: DynamoDB 기반
+- **Parameters**: SSM/Secrets Manager 캐싱
+- **Validation**: JSON Schema
+
+> 💡 시험에는 직접 안 나와도 실무 코드 베이스에서 표준이라 알아두면 좋음.
+
+### 관련 서비스 Cross-Reference
+
+- **KMS 봉투 암호화** → [Week 9 Day 1]
+- **Secrets Manager 자동 회전** → [Week 9 Day 2]
+- **CodeDeploy + Lambda Hooks** → [Week 8 Day 3]
+- **SAM/CloudFormation으로 레이어 관리** → [Week 12 Day 5]
+
+---
+
 ## 아키텍처 다이어그램
 
 ```

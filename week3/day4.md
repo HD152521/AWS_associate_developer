@@ -120,6 +120,94 @@ Destinations는 DLQ의 더 발전된 형태입니다.
 
 ---
 
+## 🧠 알아두면 좋은 심화 이론
+
+### 동시성 4종 - 정확한 차이 (시험에서 헷갈리기 좋음)
+
+| 종류 | 단위 | 비용 | 용도 |
+|------|------|------|------|
+| **계정 동시성 한도** | 리전 전체 | - | 기본 1,000 (증가 요청 가능) |
+| **예약 동시성 (Reserved)** | 함수당 | 무료 | 함수별 상한선 보장 |
+| **프로비저닝된 동시성 (Provisioned)** | 함수·버전·별칭당 | 시간당 과금 | 콜드 스타트 제거 |
+| **버스트 동시성** | 리전 즉시 한도 | - | 초기 500~3,000 + 분당 +500 |
+
+> ⚠️ **함정**:
+> - **Reserved=0** → 함수 완전 비활성화
+> - Reserved를 설정한 함수는 **전체 동시성 풀에서 그만큼 차감** (나머지 함수가 쓸 수 있는 양 ↓)
+> - Provisioned는 **버전 또는 별칭**에만 설정 가능 ($LATEST 불가)
+
+### 동시성 스케일링 한도 (시험에 자주 나옴)
+
+```
+초기 버스트:     ~3,000 (리전에 따라 500/1,000/3,000)
+이후:           분당 +500 동시성씩 증가
+계정 한도까지 도달 가능
+```
+
+스케일링 속도 한도를 넘으면 **429 스로틀링** → 동기 호출자가 직접 백오프해야 함.
+
+### 동기 vs 비동기 vs ESM 에러 처리 정확히
+
+| 트리거 | 에러 발생 시 |
+|--------|---------------|
+| **동기 (API GW)** | 500 응답 → API GW가 클라이언트에 5xx |
+| **비동기 (S3, SNS)** | 자동 2회 재시도 → DLQ/Destinations |
+| **SQS** | 가시성 타임아웃 후 메시지 큐로 복귀 (`maxReceiveCount` 도달 시 SQS DLQ로) |
+| **Kinesis/DDB Streams** | 기본 무한 재시도 (전체 샤드 블록!) → MaximumRetryAttempts·MaximumRecordAgeInSeconds 설정 필수 |
+
+> ⚠️ **함정**: Kinesis ESM에서 한 레코드가 계속 실패하면 **전체 샤드가 막힘** → 시험 시나리오. 대응: BisectBatchOnFunctionError + OnFailure destination.
+
+### SQS DLQ vs Lambda DLQ - 다른 개념!
+
+| 항목 | SQS DLQ | Lambda DLQ |
+|------|---------|------------|
+| 위치 | SQS 큐의 속성 | Lambda 함수 속성 |
+| 동작 | `maxReceiveCount` 초과 메시지 자동 이동 | Lambda 비동기 호출 최종 실패 시 발송 |
+| 적용 | SQS → Lambda 모두 | 비동기 호출만 |
+
+> 시험에 SQS-Lambda 시나리오에서 "메시지 4번 실패하면 어디로?" → **SQS 큐의 DLQ** 설정.
+
+### Lambda Function URL과 동시성
+
+- Function URL도 일반 동기 호출과 같음
+- 429 스로틀 발생 가능
+- API Gateway 같은 자동 백오프는 없음 → 클라이언트가 처리
+
+### CloudWatch Lambda 메트릭 (시험 출제 - Troubleshooting)
+
+| 메트릭 | 의미 |
+|--------|------|
+| **Invocations** | 호출 횟수 |
+| **Duration** | 실행 시간 |
+| **Errors** | 함수 오류 수 |
+| **Throttles** | 스로틀된 호출 수 |
+| **ConcurrentExecutions** | 동시 실행 수 |
+| **ProvisionedConcurrencyUtilization** | PC 사용률 (80% 넘으면 부족) |
+| **IteratorAge** | Kinesis/DDB Streams 처리 지연 |
+| **DeadLetterErrors** | DLQ 전송 실패 (DLQ 권한 부족) |
+
+> 💡 **IteratorAge가 계속 증가** → Lambda가 스트림을 못 따라잡음 → 동시성 ↑, ParallelizationFactor ↑, 처리 로직 최적화.
+
+### Reserved와 Provisioned 같이 쓰는 패턴
+
+```
+함수 A: Reserved Concurrency = 100
+         Provisioned Concurrency = 30 (버전 5 별칭 "prod")
+         
+의미: 항상 30개 환경 미리 켜둠 (콜드 X)
+      최대 100개까지 확장
+      나머지 70개는 일반 환경에서 콜드 스타트 발생 가능
+```
+
+### 관련 서비스 Cross-Reference
+
+- **CloudWatch 경보 → Auto-rollback** → [Week 8 Day 3 CodeDeploy]
+- **X-Ray** → [Week 10 Day 3]: Lambda 함수 추적
+- **EventBridge 스케줄** → [Week 11 Day 3]
+- **SQS visibility timeout** → [Week 11 Day 1]
+
+---
+
 ## 아키텍처 다이어그램
 
 ```

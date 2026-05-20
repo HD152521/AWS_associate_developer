@@ -68,7 +68,40 @@
 - 샤드당 하나의 Lambda 함수
 - 배치 크기: 1~10,000 레코드
 
-### 3. 이벤트 소스 매핑 상세
+### 3. 이벤트 소스 매핑 디테일
+
+#### ESM 핵심 파라미터 (시험 출제)
+
+| 파라미터 | 설명 |
+|----------|------|
+| **BatchSize** | 한 번에 가져올 레코드 수 (SQS 최대 10,000) |
+| **MaximumBatchingWindowInSeconds** | 배치가 다 차지 않아도 강제 호출 (최대 300초) |
+| **ParallelizationFactor** | Kinesis/DDB Streams 샤드당 동시 처리 수 (1~10) |
+| **MaximumRetryAttempts** | 실패 시 재시도 (Kinesis/DDB Streams: 0~10,000) |
+| **MaximumRecordAgeInSeconds** | 이 시간 지난 레코드는 폐기 |
+| **BisectBatchOnFunctionError** | 실패 시 배치를 절반으로 나눠 재시도 |
+| **OnFailure DestinationConfig** | 실패 레코드를 SQS/SNS로 |
+
+> 💡 **ParallelizationFactor=10** 이면 같은 샤드도 10개 Lambda가 동시 실행 → Kinesis 처리량 ↑ (순서는 파티션 키 단위 유지).
+
+#### Partial Batch Response (시험 빈출 - 2021 추가)
+
+SQS/Kinesis ESM에서 일부 레코드만 실패할 때 성공한 것은 유지, 실패한 것만 재시도.
+
+```python
+def lambda_handler(event, context):
+    batch_item_failures = []
+    for record in event['Records']:
+        try:
+            process(record)
+        except Exception:
+            batch_item_failures.append({'itemIdentifier': record['messageId']})
+    return {'batchItemFailures': batch_item_failures}
+```
+
+> ⚠️ **함정**: 이 설정 없이는 한 메시지 실패 = 전체 배치 재시도 = 중복 처리. 시험 시나리오: "Lambda가 SQS 메시지 일부만 실패하는데 전부 다시 처리돼요" → 답: Partial Batch Response 활성화.
+
+### 4. 이벤트 소스 매핑 상세
 
 ```
 [SQS/Kinesis/DynamoDB Streams]
@@ -88,6 +121,94 @@
         v
  [재시도 or DLQ 전송]
 ```
+
+---
+
+## 🧠 알아두면 좋은 심화 이론
+
+### 호출 유형별 상세 비교 (시험 핵심)
+
+| 유형 | 예시 트리거 | 재시도 | DLQ/Destinations | 응답 형태 |
+|------|-------------|--------|--------------------|-----------|
+| **동기** | API GW, ALB, Cognito, Lex, Step Functions, `Invoke RequestResponse` | 호출자 책임 | ❌ | 즉시 응답 |
+| **비동기** | S3, SNS, EventBridge, CodeCommit, `Invoke Event` | 0/1/2회 (설정) | ✅ DLQ 또는 Destinations | Lambda가 ACK만 |
+| **이벤트 소스 매핑(Poll)** | SQS, Kinesis, DDB Streams, MSK, Kafka | 설정 가능 | ❌ DLQ는 큐 자체에 | 큐/스트림 진전 |
+
+### Lambda Destinations vs DLQ - 정확한 차이
+
+| 항목 | DLQ | Destinations |
+|------|-----|--------------|
+| 트리거 | 실패만 | 성공/실패 |
+| 대상 | SQS, SNS | SQS, SNS, **EventBridge, Lambda** |
+| 메타데이터 | 페이로드만 | 요청·응답·에러 컨텍스트 포함 |
+| 권장 | 레거시 | ✅ 현재 권장 |
+
+### S3 이벤트 통합 - 두 가지 방식 (헷갈리기 쉬움)
+
+| 방식 | 설명 |
+|------|------|
+| **S3 Event Notifications (레거시)** | S3 → Lambda/SQS/SNS 직접. 버킷당 단순 라우팅 |
+| **S3 → EventBridge (권장)** | 더 풍부한 필터링, 여러 타겟, 아카이브·리플레이 |
+
+> 💡 시험에 "여러 곳에 동일 이벤트 전송 + 필터링" 시나리오 → **EventBridge 모드**.
+
+### S3 → Lambda 무한 루프 회피 (시험 함정)
+
+```
+[bucket A] → upload → Lambda → write back to [bucket A]
+   ↑                                        |
+   └────────── 무한 호출! ────────────────┘
+```
+
+**해결책 3가지:**
+1. **다른 버킷에 출력** (가장 권장)
+2. **prefix/suffix 필터**: `input/` 폴더 업로드만 트리거
+3. **객체 태그 검사**: 처리된 객체는 `processed=true` 태그 후 건너뛰기
+
+### Kinesis vs DynamoDB Streams + Lambda
+
+| 항목 | Kinesis | DynamoDB Streams |
+|------|---------|------------------|
+| 보존 기간 | 24시간 ~ 365일 | **24시간 고정** |
+| 샤드/순서 | 파티션 키 단위 순서 | 파티션 키 단위 순서 |
+| 시작 위치 | LATEST, TRIM_HORIZON, AT_TIMESTAMP | LATEST, TRIM_HORIZON |
+| 처리량 | 샤드당 (RecordSize 제한 1MB) | 자동 확장 |
+
+### 멱등성(Idempotency) - 실무 핵심
+
+비동기/폴링 호출은 **최소 1회 전달(at-least-once)** → 같은 이벤트 중복 호출 가능.
+
+**대응 패턴:**
+- **Lambda Powertools idempotency 데코레이터** (DynamoDB에 idempotency key 저장)
+- **DynamoDB 조건부 쓰기** (`attribute_not_exists`)
+- **SQS FIFO + Message Deduplication**
+
+```python
+from aws_lambda_powertools.utilities.idempotency import idempotent
+from aws_lambda_powertools.utilities.idempotency.persistence.dynamodb import DynamoDBPersistenceLayer
+
+persistence_layer = DynamoDBPersistenceLayer(table_name="IdempotencyTable")
+
+@idempotent(persistence_store=persistence_layer)
+def lambda_handler(event, context):
+    # 같은 이벤트로 다시 호출돼도 한 번만 실행
+    return process(event)
+```
+
+### EventBridge → Lambda 패턴
+
+- **스케줄 표현식**: `rate(5 minutes)`, `cron(0 9 * * ? *)`
+- **이벤트 패턴**: JSON 필터로 정확한 이벤트만 매칭
+- **Schedule Group** (2022 신기능): 수백만 개 스케줄 관리
+
+### 관련 서비스 Cross-Reference
+
+- **SQS 가시성 타임아웃** → [Week 11 Day 1]
+- **Kinesis Data Streams 상세** → [Week 11 Day 4]
+- **DynamoDB Streams** → [Week 6 Day 3]
+- **EventBridge** → [Week 11 Day 3]
+- **API Gateway → Lambda** → [Week 4 Day 5]
+- **Step Functions** → 시험엔 가끔, Lambda 오케스트레이션
 
 ---
 

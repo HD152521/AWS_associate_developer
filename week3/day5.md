@@ -44,6 +44,58 @@ $LATEST → 개발 중인 최신 코드
 
 ---
 
+## 🧠 Week 3 시험 함정 & 약어
+
+### Lambda 헷갈리는 비교
+
+| A | B | 핵심 |
+|---|---|------|
+| 동기 호출 | 비동기 호출 | API GW(동기) vs S3(비동기) |
+| 비동기 | 이벤트 소스 매핑 | Lambda가 수신 vs Lambda가 폴링 |
+| 예약 동시성 | 프로비저닝된 동시성 | 상한 설정 vs 미리 켜둠 |
+| Reserved=0 | 함수 삭제 | 일시 비활성화 vs 완전 제거 |
+| $LATEST | 버전 | 변경 가능 vs 불변 |
+| 별칭 | 버전 | 포인터 vs 스냅샷 |
+| DLQ | Destinations | 실패만·구형 vs 성공·실패·신형 |
+| 환경 변수 | Secrets Manager | 평문 위험 vs 자동 회전·암호화 |
+| Layer | 함수 코드 | /opt vs /var/task |
+| SnapStart | Provisioned Concurrency | Java/Python 무료 vs 모든 런타임·유료 |
+| ENI 콜드 스타트 (구버전) | Hyperplane ENI (현재) | 수십 초 vs 무시 가능 |
+
+### Week 3 시험 함정 12가지
+
+1. **타임아웃 최대 15분** — Step Functions는 1년
+2. **메모리 = vCPU** — 메모리 ↑면 자동으로 CPU·네트워크도 ↑
+3. **/tmp 공유 위험** — 같은 환경 재사용 시 이전 데이터 잔존
+4. **Reserved=0은 비활성화**
+5. **Provisioned는 별칭/버전에만**, `$LATEST` 불가
+6. **Kinesis ESM 실패 = 샤드 블록** → MaximumRetryAttempts 설정 필수
+7. **S3 무한 루프** — 같은 버킷에 출력 금지
+8. **레이어 최대 5개**, 합계 250MB (압축 해제)
+9. **컨테이너 이미지 10GB**
+10. **비동기 재시도 = 2회**, 1분/2분 간격
+11. **별칭 가중치 라우팅은 2개 버전만**
+12. **VPC 연결 시 인터넷 차단** — NAT GW/VPC Endpoint 필요
+
+### Week 3 약어 정리
+
+| 약어 | 풀네임 |
+|------|--------|
+| **DLQ** | Dead Letter Queue |
+| **ESM** | Event Source Mapping |
+| **PC** | Provisioned Concurrency |
+| **ARN** | Amazon Resource Name |
+| **ENI** | Elastic Network Interface |
+| **EFS** | Elastic File System (Lambda 마운트 가능) |
+| **DDB** | DynamoDB |
+| **SAM** | Serverless Application Model |
+| **SnapStart** | Java/Python/.NET 초기화 스냅샷 |
+| **EMF** | Embedded Metric Format |
+| **TTFB** | Time To First Byte (Response Streaming) |
+| **IAM** | (실행 역할 + 리소스 정책 양쪽) |
+
+---
+
 ## 아키텍처 다이어그램 - 완전한 서버리스 아키텍처
 
 ```

@@ -98,6 +98,100 @@ Lambda는 다음 언어를 네이티브로 지원합니다:
 
 ---
 
+## 🧠 알아두면 좋은 심화 이론
+
+### Lambda 한도 정리 (시험에서 숫자 그대로 출제)
+
+| 항목 | 한도 |
+|------|------|
+| 메모리 | 128 MB ~ 10,240 MB (1MB 단위) |
+| 타임아웃 | 1초 ~ 900초 (15분) |
+| /tmp 임시 스토리지 | 512 MB ~ 10,240 MB |
+| 환경 변수 총 크기 | 4 KB |
+| 동기 페이로드 (요청/응답) | 6 MB |
+| 비동기 페이로드 | 256 KB |
+| Response Streaming | **20 MB** |
+| ZIP 직접 업로드 | 50 MB |
+| ZIP S3 경유 | 250 MB (압축 해제) |
+| 컨테이너 이미지 | 10 GB |
+| 동시성 (계정/리전) | 기본 1,000 (증가 가능) |
+| 초기 버스트 한도 | 500~3,000 (리전별) |
+| 분당 추가 동시성 | +500 |
+
+### 콜드 스타트 최적화 옵션 4가지 비교
+
+| 옵션 | 효과 | 비용 | 사용 |
+|------|------|------|------|
+| **Provisioned Concurrency** | 콜드 완전 제거 | 가장 비쌈 | 일관된 응답 필요 |
+| **SnapStart** | 최대 10배 빠른 시작 (Java/Python/.NET) | 무료~약간 | Java/Spring 함수 |
+| **메모리 증가** | CPU도 비례 ↑ → INIT 빨라짐 | 시간당 ↑ | 일반 최적화 |
+| **레이어/코드 최적화** | 의존성 축소 | 무료 | 항상 적용 |
+
+> ⚠️ **함정**: SnapStart는 **버전 발행 시점에 스냅샷 생성** → `$LATEST`에서는 동작 X. 별칭/버전 사용 강제.
+
+### Lambda 실행 환경 - 알아두면 좋은 디테일
+
+- **재사용 가능**: 한 번 초기화한 환경이 여러 번 호출 처리 (글로벌 변수 캐시 활용)
+- **단일 요청**: 한 환경은 **한 번에 하나의 요청만** 처리 (스레드 분리 X — 동시성은 환경 수로 결정)
+- **/tmp 공유**: 같은 환경 재사용 시 /tmp도 공유됨 — **민감 데이터 저장 금지**
+- **약 1시간 무사용** → 환경 회수, 콜드 스타트 재발생
+
+### Lambda Extensions
+
+- 사이드카처럼 함수와 함께 실행되는 외부 프로세스
+- 용도: 모니터링(Datadog), 시크릿 캐싱(Parameter Store/Secrets Manager Extension), 로그 수집
+- **내부 확장** (런타임 내부) vs **외부 확장** (별도 프로세스)
+- 시험: "시크릿을 매번 호출 안 하고 캐싱하고 싶어요" → AWS Parameters and Secrets Lambda Extension
+
+### Lambda Response Streaming (2023~)
+
+- HTTP 응답을 청크 단위로 스트리밍 가능 (최대 20MB)
+- TTFB(첫 바이트 시간) 단축 → SSE, LLM 응답, 대용량 파일 다운로드
+- Function URL 또는 `aws-lambda-streamifyResponse` 사용
+
+### Lambda Function URL
+
+- 별도 HTTPS 엔드포인트를 함수에 직접 부여 (API Gateway 없이)
+- 인증: NONE 또는 AWS_IAM (SigV4)
+- CORS 직접 설정
+- 시험에 가끔: "간단한 단일 함수를 HTTPS로 노출하려면?" → Function URL
+
+### VPC에서 Lambda 실행 (시험에 자주 출제)
+
+- VPC에 연결하려면 서브넷 + 보안 그룹 지정
+- ENI(Elastic Network Interface)를 통해 VPC 리소스(RDS 등) 접근
+- **Hyperplane ENI** (2019부터): 콜드 스타트 시 ENI 생성 지연 거의 없음
+- VPC 연결 시 인터넷 직접 접근 불가 → NAT GW 필요 (또는 VPC Endpoint 사용)
+
+> ⚠️ **함정**: "Lambda가 RDS에 못 붙어요" → 1) VPC 연결 확인 2) SG 인바운드 확인 3) 서브넷이 NAT 경로 보유 확인
+
+### Lambda 권한 모델 (2개 정책)
+
+| 정책 | 부착 위치 | 역할 |
+|------|----------|------|
+| **Execution Role** | 함수 자체 | Lambda가 **다른 AWS 서비스 호출**할 권한 |
+| **Resource-based Policy (Function Policy)** | 함수에 리소스 정책으로 | **누가 Lambda를 호출**할 수 있는지 (S3, SNS, API GW 등) |
+
+```bash
+# API Gateway가 Lambda 호출 권한 부여 (리소스 정책)
+aws lambda add-permission \
+  --function-name my-function \
+  --statement-id apigateway-prod \
+  --action lambda:InvokeFunction \
+  --principal apigateway.amazonaws.com \
+  --source-arn "arn:aws:execute-api:region:account:api-id/*/*/*"
+```
+
+### 관련 서비스 Cross-Reference
+
+- **이벤트 소스 매핑(SQS/Kinesis/DDB Streams)** → [Day 2]
+- **Layer/버전/별칭** → [Day 3]
+- **동시성·DLQ** → [Day 4]
+- **API Gateway 통합** → [Week 4]
+- **Lambda + Step Functions** → 15분 초과 워크플로 (Step Functions가 오케스트레이션)
+
+---
+
 ## 아키텍처 다이어그램
 
 ```
