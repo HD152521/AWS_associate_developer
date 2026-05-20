@@ -61,6 +61,70 @@ taskRole: 컨테이너가 AWS 서비스 접근
 
 ---
 
+## 🧠 Week 12 시험 함정 & 약어
+
+### 헷갈리는 비교
+
+| A | B | 핵심 |
+|---|---|------|
+| ECS EC2 시작 | Fargate | 직접 관리 vs 서버리스 |
+| executionRole | taskRole | ECR/Logs vs 앱→AWS 서비스 |
+| awsvpc | bridge | ENI per task vs Docker NAT |
+| ECS | EKS | AWS 자체 vs 쿠버네티스 |
+| ECR Basic Scan | Enhanced Scan | 무료·CVE vs Inspector·유료 |
+| Fargate | Fargate Spot | 정규 vs 회수·70% 저렴 |
+| CloudFormation | SAM | 범용 vs 서버리스 특화 |
+| SAM | CDK | YAML 매크로 vs 프로그래밍 |
+| Change Set | Direct Update | 미리보기 vs 즉시 적용 |
+| DeletionPolicy: Retain | Snapshot | 그대로 유지 vs 스냅샷 생성 |
+| Stack Policy | Termination Protection | 업데이트 보호 vs 삭제 방지 |
+| !Ref | !GetAtt | 리소스 자체 vs 속성 |
+| !Sub | !Join | ${} 치환 vs 문자열 연결 |
+| Nested Stack | Stack Set | 한 계정 vs 다중 계정/리전 |
+| Custom Resource | Hook | 사용자 정의 리소스 vs 검증 |
+| Drift Detection | Change Set | 실제 차이 감지 vs 미리보기 |
+
+### Week 12 시험 함정 15가지
+
+1. **Fargate는 awsvpc만**
+2. **executionRole vs taskRole 헷갈리지 않기**
+3. **ECR 인증 토큰 12시간**
+4. **Fargate Spot은 2분 알림 후 회수**
+5. **CloudFormation Drift 자동 감지 안 됨**
+6. **Change Set은 안전한 업데이트 표준**
+7. **DeletionPolicy Retain ≠ Termination Protection** (다른 개념)
+8. **!ImportValue는 같은 리전 내 스택끼리만** (cross-region X)
+9. **SAM Transform 선언 필수**
+10. **`sam local`은 Docker 필요**
+11. **SAM Policy Templates 외워두면 점수 ↑**
+12. **CDK는 cdk synth → CFN으로 변환**
+13. **CDK bootstrap은 계정·리전당 1회**
+14. **Stack Set은 Organizations로 다중 계정**
+15. **Lambda→Lambda 직접 호출은 안티 패턴** (SQS/SNS 사용)
+
+### Week 12 약어 정리
+
+| 약어 | 풀네임 |
+|------|--------|
+| **ECS** | Elastic Container Service |
+| **EKS** | Elastic Kubernetes Service |
+| **ECR** | Elastic Container Registry |
+| **CFN** | CloudFormation |
+| **SAM** | Serverless Application Model |
+| **SAR** | Serverless Application Repository |
+| **CDK** | Cloud Development Kit |
+| **IaC** | Infrastructure as Code |
+| **ENI** | Elastic Network Interface |
+| **CVE** | Common Vulnerabilities and Exposures |
+| **mTLS** | Mutual TLS |
+| **DLM** | Data Lifecycle Manager |
+| **Saga** | 분산 트랜잭션 보상 |
+| **OCI** | Open Container Initiative |
+| **PaaS** | Platform as a Service |
+| **Well-Architected** | 6 Pillars Framework |
+
+---
+
 ## 📝 Week 12 종합 연습문제
 
 **문제 1.** EC2 없이 컨테이너를 실행하려면?

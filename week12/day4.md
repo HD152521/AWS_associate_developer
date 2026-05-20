@@ -168,6 +168,99 @@ Troubleshooting (문제 해결): 18%
 
 ---
 
+## 🧠 알아두면 좋은 심화 이론
+
+### CDK 핵심 개념 (시험에는 가끔, 실무 표준)
+
+| 개념 | 의미 |
+|------|------|
+| **App** | CDK 앱 (최상위) |
+| **Stack** | CloudFormation 스택에 매핑 |
+| **Construct** | 재사용 가능한 빌딩 블록 |
+| **Construct Level** | L1(CFN 직접), L2(편의), L3(패턴) |
+| **synth** | CFN 템플릿으로 변환 |
+| **deploy** | 변환 + CloudFormation 배포 |
+| **bootstrap** | CDK 부트스트랩 (계정·리전당 1회) |
+
+### CDK 지원 언어
+
+TypeScript, Python, Java, C#, Go (시험엔 거의 안 나옴)
+
+### CDK Pipelines
+
+- CDK 코드로 CodePipeline 자체를 정의
+- Self-mutating: 파이프라인 자체가 새 코드로 자동 업데이트
+- 시험엔 거의 안 나옴 (실무)
+
+### IaC 도구 비교 (시험에 가끔)
+
+| 도구 | 언어 | 사용 시 |
+|------|------|---------|
+| **CloudFormation** | YAML/JSON | AWS 표준, 가장 안정 |
+| **SAM** | YAML | 서버리스 전문 |
+| **CDK** | TS/Python/Java | 프로그래밍 가능, 추상화 ↑ |
+| **Terraform** (3rd) | HCL | 멀티 클라우드 |
+| **Pulumi** (3rd) | 다중 언어 | 다중 클라우드 + 프로그래밍 |
+
+### 서버리스 아키텍처 모범 사례 (시험 빈출 시나리오)
+
+#### 1. 비동기 통신 우선
+- Lambda → Lambda 직접 호출 X
+- SQS / SNS / EventBridge 경유
+
+#### 2. 멱등성 보장
+- 같은 요청 두 번 처리해도 같은 결과
+- DynamoDB conditional write 또는 idempotency key
+
+#### 3. 작은 함수, 단일 책임
+- 한 Lambda = 한 일
+- 큰 함수보다 작은 여러 함수 + 오케스트레이션
+
+#### 4. 백프레셔 처리
+- SQS DLQ 활용
+- 다운스트림 한도 인지
+
+#### 5. 캐싱 적극 사용
+- ElastiCache, DAX, API GW Cache, Lambda Extension
+
+#### 6. 콜드 스타트 최소화
+- Provisioned Concurrency · SnapStart · 패키지 크기 ↓
+
+### AWS Well-Architected Framework 6 Pillars
+
+1. **Operational Excellence**
+2. **Security**
+3. **Reliability**
+4. **Performance Efficiency**
+5. **Cost Optimization**
+6. **Sustainability** (2021 추가)
+
+> 시험에 가끔: "다음 중 잘 설계된 아키텍처에 가장 부합하는 것은?" → 6 Pillars 관점.
+
+### 시험 자주 출제 아키텍처 패턴 (정리)
+
+| 시나리오 | 답 |
+|----------|-----|
+| 이미지 업로드 후 자동 처리 | S3 → Lambda |
+| 대용량 비동기 처리 | SQS → Lambda |
+| 실시간 분석 | Kinesis → Lambda |
+| 워크플로 (인간 승인 포함) | Step Functions |
+| 멀티 마이크로서비스 라우팅 | API Gateway → 여러 Lambda |
+| 동기 API + 캐싱 | API Gateway 캐시 + Lambda + DAX |
+| 글로벌 멀티 리전 | CloudFront + Global Accelerator + Aurora Global / DDB Global |
+| 모바일 + 실시간 푸시 | AppSync + Cognito + DDB |
+| 컨테이너 + ALB | ECS Fargate + ALB |
+| 자동 확장 + 비용 | Fargate + Spot |
+
+### 관련 서비스 Cross-Reference
+
+- **CDK ↔ CloudFormation** → 합성·배포
+- **Step Functions ↔ Lambda** → 워크플로 오케스트레이션
+- **AWS SAM ↔ CodeDeploy** → Canary 자동
+- **Well-Architected Tool** → 자동 진단
+
+---
+
 ## 아키텍처 다이어그램
 
 ```

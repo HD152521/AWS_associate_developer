@@ -174,6 +174,95 @@ aws cloudformation execute-change-set \
 
 ---
 
+## 🧠 알아두면 좋은 심화 이론
+
+### CloudFormation 핵심 함수 추가 (시험 자주)
+
+| 함수 | 용도 |
+|------|------|
+| `!Cidr` | CIDR 블록 분할 |
+| `!Base64` | Base64 인코딩 (UserData) |
+| `!Split` | 문자열 분리 |
+| `!Length` | 배열 길이 |
+| `!Transform` | 매크로 (Include 등) |
+| `!GetAZs` | 리전의 AZ 목록 |
+| `Fn::ToJsonString` | JSON 변환 (2023~) |
+
+### Pseudo Parameters (시험 가끔)
+
+```
+AWS::AccountId       → 12자리 계정 ID
+AWS::Region          → 현재 리전
+AWS::StackName       → 스택 이름
+AWS::StackId         → 스택 ID
+AWS::Partition       → aws / aws-cn / aws-us-gov
+AWS::URLSuffix       → amazonaws.com / amazonaws.com.cn
+AWS::NoValue         → 속성 제거
+```
+
+### CloudFormation Stack 종류 (시험 빈출)
+
+| 종류 | 설명 |
+|------|------|
+| **Stack** | 기본 |
+| **Nested Stack** | 스택 안의 스택, 재사용 |
+| **Stack Set** | 여러 계정·리전에 동일 스택 배포 (Organizations) |
+| **Change Set** | 변경 미리보기 |
+
+### 리소스 속성 (시험 자주)
+
+| 속성 | 동작 |
+|------|------|
+| `DeletionPolicy: Retain` | 스택 삭제해도 리소스 유지 (DB 보호) |
+| `DeletionPolicy: Snapshot` | 삭제 전 스냅샷 (RDS/EBS) |
+| `UpdateReplacePolicy: Retain` | 교체 시 기존 유지 |
+| `CreationPolicy` | 시작 대기 (CFN Helper Scripts와) |
+| `UpdatePolicy` | ASG 롤링 업데이트 정책 |
+| `DependsOn` | 명시적 종속성 |
+| `Metadata` | 추가 정보 |
+| `Condition` | 조건부 생성 |
+
+### Custom Resources (시험에 가끔)
+
+- CloudFormation이 직접 지원 안 하는 리소스 생성·관리
+- Lambda 함수 호출로 구현 (Create/Update/Delete 이벤트)
+- 사용: 외부 SaaS 통합, 복잡한 초기화
+
+### Stack 정책 vs IAM 정책 vs Termination Protection (시험 함정)
+
+| 보호 | 범위 |
+|------|------|
+| **Stack Policy** | 스택 업데이트 시 리소스 보호 (Update/Replace) |
+| **IAM Policy** | 누가 스택을 조작할 수 있는지 |
+| **Termination Protection** | 스택 자체 삭제 방지 |
+| **DeletionPolicy** | 스택 삭제 시 개별 리소스 처리 |
+
+### Drift Detection (시험 자주)
+
+- 콘솔에서 수동 변경된 리소스 감지
+- CFN 템플릿과 실제 리소스 차이 확인
+- 자동 감지 X — 명시적으로 실행
+
+### 가격 (시험 가끔)
+
+- CloudFormation 자체는 **무료** (생성한 리소스만 과금)
+- Third-party 확장 또는 Hooks는 별도
+
+### Hooks (시험 가끔)
+
+- 스택 작업 전 자동 검증 (보안 정책, 컴플라이언스)
+- 위반 시 작업 차단
+- 시나리오: "암호화 안 된 S3 버킷 차단" → Hook
+
+### 관련 서비스 Cross-Reference
+
+- **CloudFormation ↔ Service Catalog** → 승인된 IaC 제공
+- **CloudFormation ↔ CodePipeline** → IaC 자동 배포
+- **CloudFormation ↔ AWS Config** → 컴플라이언스 감사
+- **CloudFormation Drift ↔ Config Rules** → 자동 감지
+
+---
+
 ## 아키텍처 다이어그램
 
 ```

@@ -106,6 +106,65 @@ docker push 123456789.dkr.ecr.ap-northeast-2.amazonaws.com/my-app:latest
 - 교차 리전/계정 복제
 - OCI 아티팩트 지원
 
+### 4-1. 심화 이론 - ECS/Fargate/ECR
+
+#### Task Placement Strategies (EC2 시작 유형, 시험 가끔)
+
+| 전략 | 동작 |
+|------|------|
+| **binpack** | CPU·메모리 사용량 최대화 (적은 인스턴스에 몰빵) |
+| **random** | 무작위 |
+| **spread** | 인스턴스/AZ/host 균등 분산 (HA) |
+
+#### Capacity Provider Strategy
+
+- 여러 시작 유형 혼합 (EC2 + Fargate + Spot)
+- Auto Scaling Group과 연계
+- 시험 시나리오: "비용 절감 + 안정성" → Fargate + Fargate Spot 조합
+
+#### Fargate Spot
+
+- 정규 Fargate보다 **최대 70% 저렴**
+- 2분 전 알림 후 회수
+- 비-필수 작업 (배치, ML 학습)
+
+#### Network Mode (EC2 시작 유형 시 선택)
+
+| 모드 | 설명 |
+|------|------|
+| **bridge** | Docker 기본, 호스트 NAT |
+| **host** | 호스트 네트워크 직접 사용 |
+| **awsvpc** | 태스크마다 ENI (Fargate는 강제) |
+| **none** | 네트워크 없음 |
+
+#### ECS Service Discovery (시험 가끔)
+
+- AWS Cloud Map과 통합
+- 마이크로서비스끼리 DNS로 발견
+- API Gateway HTTP API에서 VPC Link로 연결 가능
+
+#### Service Connect (2022 신규)
+
+- Service Mesh 라이트 버전
+- 자동 mTLS, 트래픽 모니터링
+- ECS 마이크로서비스 통신 단순화
+
+#### ECS Anywhere & EKS Anywhere
+
+- 온프레미스 서버에 ECS/EKS Agent 설치 → AWS에서 관리
+- 하이브리드 워크로드
+
+#### ECR 디테일
+
+| 항목 | 내용 |
+|------|------|
+| **Image Scanning** | Basic (CVE 무료) / Enhanced (Inspector 통합, 유료) |
+| **Lifecycle Policy** | 태그·일수·개수 기준 자동 정리 |
+| **Replication** | 리전 간·계정 간 자동 복제 |
+| **Pull-through Cache** | Docker Hub·ECR Public 캐시 (속도·rate limit 회피) |
+| **Image Signing** | AWS Signer로 서명 |
+| **인증** | IAM (12시간 토큰), `aws ecr get-login-password` |
+
 ### 5. ECS 서비스와 ALB 통합
 
 ```bash

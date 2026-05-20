@@ -169,6 +169,114 @@ Policies:
 
 ---
 
+## 🧠 알아두면 좋은 심화 이론
+
+### SAM 리소스 매핑 (시험 가끔)
+
+| SAM 리소스 | 생성되는 CFN 리소스 |
+|------------|--------------------|
+| `AWS::Serverless::Function` | Lambda Function + Role + EventSource + Permissions |
+| `AWS::Serverless::Api` | API Gateway RestApi + Deployment + Stage + Methods |
+| `AWS::Serverless::HttpApi` | API Gateway V2 |
+| `AWS::Serverless::SimpleTable` | DynamoDB Table |
+| `AWS::Serverless::StateMachine` | Step Functions |
+| `AWS::Serverless::LayerVersion` | Lambda Layer |
+| `AWS::Serverless::Application` | Nested Stack |
+
+### SAM 이벤트 소스 (시험 자주)
+
+```yaml
+Events:
+  # HTTP API
+  Api:        Type: Api / HttpApi
+  # 비동기 트리거
+  S3:         Type: S3
+  SNS:        Type: SNS
+  Schedule:   Type: Schedule  # cron / rate
+  # 폴링
+  SQS:        Type: SQS
+  DynamoDB:   Type: DynamoDB
+  Kinesis:    Type: Kinesis
+  Kafka:      Type: MSK
+  # 기타
+  Cognito:    Type: Cognito
+  EventBridge: Type: EventBridgeRule
+```
+
+### sam deploy --guided 옵션
+
+- 첫 배포 시 wizard로 설정 (Stack 이름·리전·확인)
+- `samconfig.toml`에 저장
+- 다음 배포부터 `sam deploy`만으로 가능
+
+### SAM Pipeline & SAM CLI 신규
+
+- `sam pipeline init` → CI/CD 파이프라인 자동 생성 (CodePipeline 또는 GitHub Actions)
+- `sam sync --watch` → 코드 변경 자동 배포 (개발용)
+- `sam logs` → CloudWatch Logs tail
+
+### Lambda Layer를 SAM에서
+
+```yaml
+MyLayer:
+  Type: AWS::Serverless::LayerVersion
+  Properties:
+    LayerName: shared-libs
+    ContentUri: ./layer/
+    CompatibleRuntimes: [python3.9, python3.10]
+
+MyFunction:
+  Type: AWS::Serverless::Function
+  Properties:
+    Layers:
+      - !Ref MyLayer
+```
+
+### Globals 섹션 (시험 가끔)
+
+```yaml
+Globals:
+  Function:
+    Runtime: python3.9
+    Timeout: 30
+    MemorySize: 256
+    Environment:
+      Variables:
+        LOG_LEVEL: INFO
+  Api:
+    Cors: "'*'"
+```
+
+모든 Function·Api·HttpApi·SimpleTable에 적용. 개별 리소스에서 override 가능.
+
+### SAM Accelerate (`sam sync`)
+
+- 빠른 개발 사이클: 코드 변경 시 빌드·배포 단축
+- Lambda 함수 코드만 업데이트 (CFN 변경 없음)
+- 시험엔 거의 안 나옴 (개발자 경험)
+
+### SAM Connector (2023 신규)
+
+- 리소스 간 권한·연결을 선언적으로 설정
+- IAM 정책 자동 생성
+
+```yaml
+Connectors:
+  MyConnector:
+    Source: !Ref MyFunction
+    Destination: !Ref MyTable
+    Permissions: [Read, Write]
+```
+
+### 관련 서비스 Cross-Reference
+
+- **SAM ↔ CloudFormation** → SAM은 CFN 매크로
+- **SAM ↔ CodeDeploy** → Lambda Canary 배포 자동
+- **SAM Local + AWS Toolkit** → IDE 통합 디버깅
+- **AWS::Serverless::Application** → SAR (Serverless Application Repository)
+
+---
+
 ## 아키텍처 다이어그램
 
 ```
