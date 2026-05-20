@@ -123,6 +123,107 @@ packages:
 
 ---
 
+## 🧠 알아두면 좋은 심화 이론
+
+### Beanstalk 배포 전략 6종 (시험 매우 빈출 표)
+
+| 전략 | 다운타임 | 새 인스턴스 | 비용 | 롤백 |
+|------|---------|-------------|------|------|
+| **All at once** | ✅ | ❌ | 동일 | 재배포만 |
+| **Rolling** | ❌ | ❌ | 동일 | 재배포 |
+| **Rolling with additional batch** | ❌ | ✅ 일부 추가 | 약간 ↑ | 재배포 |
+| **Immutable** | ❌ | ✅ 새 ASG | **2x** | **빠름** |
+| **Blue/Green** | ❌ | ✅ 새 환경 | **2x** | **즉시** (URL swap) |
+| **Traffic Splitting** (Canary) | ❌ | ✅ 새 ASG | 일시 2x | **자동** |
+
+> 💡 **시나리오 선택**:
+> - "비용 절감 + 빠름" → All at once (개발 환경)
+> - "다운타임 X + 가성비" → Rolling
+> - "프로덕션 + 즉시 롤백" → **Immutable** 또는 **Blue/Green**
+> - "점진적 위험 분산" → Traffic Splitting
+
+### 환경 유형 (시험 출제)
+
+| 유형 | 구성 |
+|------|------|
+| **Web Server Environment** | ALB + ASG + EC2 (요청 처리) |
+| **Worker Environment** | SQS + EC2 (백그라운드 처리, SQS Daemon이 메시지 폴링) |
+
+### `cron.yaml` (Worker 환경 - 정기 작업)
+
+```yaml
+version: 1
+cron:
+  - name: "daily-report"
+    url: "/reports/daily"
+    schedule: "0 0 * * *"
+```
+
+> 💡 Worker 환경의 SQS Daemon이 자동으로 HTTP POST → 컨테이너에 전달.
+
+### .ebextensions 구조
+
+```
+my-app/
+  application.py
+  .ebextensions/
+    01_packages.config       # 알파벳 순으로 실행
+    02_files.config
+    03_commands.config
+    04_options.config
+  .platform/                  # AL2/AL2023 신규 방식
+    nginx/
+      conf.d/
+        custom.conf
+    hooks/
+      prebuild/
+      postdeploy/
+```
+
+> ⚠️ **함정**: Amazon Linux 2/2023부터 `.ebextensions` → `.platform/` 권장. nginx 설정·hook 스크립트.
+
+### Beanstalk Saved Configurations
+
+- 환경 설정을 템플릿으로 저장
+- 다른 환경 생성 시 재사용
+- S3에 저장됨
+
+### Beanstalk와 Database (시험에 자주 출제)
+
+> ⚠️ **함정**: Beanstalk 환경 안에 RDS를 만들면 **환경 삭제 시 DB도 같이 삭제!** 프로덕션 DB는 Beanstalk 외부에 별도 생성 권장.
+
+### CLI 사용
+
+```bash
+eb init       # Beanstalk 앱 초기화
+eb create     # 새 환경 생성
+eb deploy     # 새 버전 배포
+eb logs       # 로그 보기
+eb ssh        # 인스턴스 SSH
+eb terminate  # 환경 삭제
+eb config     # 환경 설정 편집
+eb swap       # URL 스왑 (Blue/Green)
+```
+
+### Beanstalk vs ECS vs Lambda 선택
+
+| 시나리오 | 선택 |
+|----------|------|
+| 빠른 PoC, AWS 깊이 몰라도 됨 | **Beanstalk** |
+| Docker 컨테이너 마이크로서비스 | **ECS / Fargate** |
+| 이벤트 기반·짧은 실행 | **Lambda** |
+| HPC·특수 인스턴스 | **EC2 직접** |
+| 쿠버네티스 표준 | **EKS** |
+
+### 관련 서비스 Cross-Reference
+
+- **Beanstalk Worker 환경 ↔ SQS** → [Week 11 Day 1]
+- **Beanstalk 환경 변수 ↔ Parameter Store/Secrets** → [Week 9 Day 2]
+- **Beanstalk 배포 ↔ CodePipeline** → [Day 3]
+- **Beanstalk ↔ CloudFormation** → 내부적으로 CFN 사용
+
+---
+
 ## 아키텍처 다이어그램
 
 ```

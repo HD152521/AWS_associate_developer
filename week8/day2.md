@@ -112,6 +112,34 @@ Hooks:
 - `Linear10PercentEvery1Minute`: 1분마다 10%씩 증가
 - `AllAtOnce`: 즉시 전체 전환
 
+### 4-1. Lambda 배포 5종 전체 (시험 매우 빈출)
+
+| 배포 전략 | 첫 트래픽 | 완전 전환 |
+|----------|----------|-----------|
+| `Canary10Percent5Minutes` | 10% | 5분 후 100% |
+| `Canary10Percent10Minutes` | 10% | 10분 후 100% |
+| `Canary10Percent15Minutes` | 10% | 15분 후 100% |
+| `Canary10Percent30Minutes` | 10% | 30분 후 100% |
+| `Linear10PercentEvery1Minute` | 10% | 10분 (1분마다 10%) |
+| `Linear10PercentEvery2Minutes` | 10% | 20분 |
+| `Linear10PercentEvery3Minutes` | 10% | 30분 |
+| `Linear10PercentEvery10Minutes` | 10% | 100분 |
+| `AllAtOnce` | 100% | 즉시 |
+
+### 4-2. CloudWatch Alarm 자동 롤백 (시험 가끔)
+
+```yaml
+# Lambda 배포 중 알람 발생 시 자동 롤백
+DeploymentConfig:
+  AutoRollbackEnabled: true
+  AutoRollbackEvents:
+    - DEPLOYMENT_FAILURE
+    - DEPLOYMENT_STOP_ON_ALARM
+    - DEPLOYMENT_STOP_ON_REQUEST
+  Alarms:
+    - lambda-error-rate-alarm
+```
+
 ### 5. 블루/그린 배포
 
 ```
@@ -125,6 +153,96 @@ Hooks:
 검증 후 → 로드밸런서를 그린으로 전환
 롤백 → 로드밸런서를 블루로 복귀
 ```
+
+---
+
+## 🧠 알아두면 좋은 심화 이론
+
+### CodeDeploy 배포 대상별 핵심 정리 (시험 매우 빈출)
+
+| 대상 | Agent 필요 | 배포 전략 | appspec 형식 |
+|------|-----------|----------|--------------|
+| **EC2/온프레미스** | ✅ CodeDeploy Agent | In-Place / Blue-Green | YAML |
+| **Lambda** | ❌ | Canary / Linear / AllAtOnce | YAML or JSON |
+| **ECS** | ❌ | Blue-Green only | JSON |
+
+### EC2 Blue/Green 배포 디테일
+
+- 새 ASG가 자동 생성 → 새 인스턴스에 v2 배포 → ALB 타겟 그룹 전환
+- 비용: 일시적 2배 (검증 기간 동안)
+- 검증 후 원본 ASG 자동 종료 (또는 지정 시간 후)
+- 시험에 "EC2 무중단 배포 + 즉시 롤백" → Blue/Green
+
+### Lambda 배포 라이프사이클 훅 (시험 출제)
+
+| 훅 | 시점 |
+|----|------|
+| **BeforeAllowTraffic** | 새 버전 트래픽 받기 전 (스모크 테스트) |
+| **AfterAllowTraffic** | 새 버전 트래픽 받은 후 (검증) |
+
+각 훅에서 Lambda 함수 호출 → PutLifecycleEventHookExecutionStatus API로 성공/실패 보고.
+
+### EC2 라이프사이클 훅 (10단계 정확히)
+
+```
+1. ApplicationStop          ← 기존 앱 중지
+2. DownloadBundle           ← S3 또는 GitHub에서 다운로드
+3. BeforeInstall            ← 설치 전 (백업, 사전 작업)
+4. Install                  ← 파일 복사 (CodeDeploy Agent 수행)
+5. AfterInstall             ← 설치 후 (구성, 권한)
+6. ApplicationStart         ← 앱 시작
+7. ValidateService          ← 헬스 체크 / 검증
+8. BeforeBlockTraffic       ← (Blue/Green) 트래픽 차단 전
+9. BlockTraffic             ← (Blue/Green) 트래픽 차단
+10. AfterBlockTraffic       ← (Blue/Green) 차단 후
+... AllowTraffic 시리즈 (Blue/Green Green 측)
+```
+
+> 💡 In-Place는 1~7만, Blue/Green은 추가 단계.
+
+### CodeDeploy 배포 구성 (Pre-defined + Custom)
+
+| 사전 정의 (In-Place) | 의미 |
+|---------------------|------|
+| `CodeDeployDefault.AllAtOnce` | 모든 인스턴스 동시 (최소 1개 정상 시 성공) |
+| `CodeDeployDefault.HalfAtATime` | 50%씩 |
+| `CodeDeployDefault.OneAtATime` | 한 번에 1개 |
+| 커스텀 | 특정 비율 또는 인스턴스 수 |
+
+### CodeDeploy Agent 설치 방법
+
+```bash
+# Amazon Linux 2
+sudo yum update -y
+sudo yum install -y ruby wget
+wget https://aws-codedeploy-ap-northeast-2.s3.amazonaws.com/latest/install
+sudo ./install auto
+sudo systemctl enable codedeploy-agent
+sudo systemctl start codedeploy-agent
+```
+
+- Systems Manager Distributor 또는 User Data로 자동화
+- IAM 인스턴스 프로파일 필요 (`AmazonEC2RoleforAWSCodeDeploy`)
+
+### 알람·이벤트 통합
+
+- CloudWatch Alarm 위반 → 배포 중지·롤백
+- EventBridge로 배포 상태 → SNS/Slack/Lambda
+- CloudWatch Logs로 Agent 로그 수집
+
+### 시험에 자주 출제되는 ECS Blue/Green 시나리오
+
+- ECS는 **Blue/Green만** 지원 (In-Place X)
+- ALB Target Group 2개 필요 (Production + Test)
+- 컨테이너 이미지 ECR에서
+- 배포 중 Test Listener로 검증 가능
+
+### 관련 서비스 Cross-Reference
+
+- **Lambda 별칭·버전 + Canary** → [Week 3 Day 3]
+- **ALB Target Group 가중치** → [Week 2 Day 4]
+- **ECS Service** → [Week 12 Day 1·2]
+- **CloudWatch Alarm** → [Week 10 Day 1]
 
 ---
 

@@ -142,6 +142,102 @@ Source → Build → Test → Deploy → (Manual Approval) → Deploy(Prod)
 
 ---
 
+## 🧠 알아두면 좋은 심화 이론
+
+### 액션 카테고리 5종 (시험에 가끔)
+
+| 카테고리 | 예시 |
+|----------|------|
+| **Source** | CodeCommit, GitHub, S3, BitBucket, ECR, Service Catalog |
+| **Build** | CodeBuild, Jenkins |
+| **Test** | CodeBuild, Device Farm, ServiceNow Change |
+| **Approval** | Manual, ServiceNow |
+| **Deploy** | CodeDeploy, ECS, CloudFormation, Elastic Beanstalk, S3, AppConfig, Service Catalog |
+| **Invoke** | Lambda, Step Functions |
+
+### 파이프라인 트리거 방식
+
+| 방식 | 동작 |
+|------|------|
+| **EventBridge** (기본) | CodeCommit/ECR/S3 변경 즉시 |
+| **Webhook** (GitHub) | GitHub push 시 |
+| **Polling** | 1분마다 S3·GitHub 확인 (비권장) |
+| **수동** | 콘솔/CLI |
+
+### CodePipeline V2 (2023~) - 시험 신규
+
+- **변수 (Variables)**: 단계 간 값 전달 (`#{SourceVariables.CommitId}`)
+- **트리거 필터링**: 브랜치/파일 패턴 기반
+- **파이프라인 실행 모드**: SUPERSEDED / QUEUED / PARALLEL
+
+### Manual Approval 디테일
+
+- IAM `codepipeline:PutApprovalResult` 권한 필요
+- SNS 알림으로 URL 발송
+- 7일 내 응답 안 하면 자동 거부
+- 시험에 "프로덕션 배포 전 사람 승인" → Manual Approval
+
+### 단계 간 데이터 (Artifact) 전달
+
+```
+Source Output (CodeCommit) → SourceArtifact
+                              ↓
+Build Action input = SourceArtifact
+Build Action output = BuildArtifact
+                              ↓
+Deploy Action input = BuildArtifact
+```
+
+- 아티팩트는 **S3 버킷에 저장** (계정·리전당 1개 default)
+- 암호화 옵션: AWS 관리 KMS 또는 고객 관리 키
+- 보존: 30일 (자동 정리)
+
+### Cross-Region & Cross-Account 배포
+
+- 단계의 액션을 다른 리전에서 실행 가능
+- Cross-Account: 대상 계정에 IAM 역할 생성 후 신뢰 정책 + Source 계정 PassRole
+
+### 파이프라인 실패 시 동작
+
+| 동작 | 설명 |
+|------|------|
+| **Fail** | 해당 단계만 실패 표시 |
+| **재실행 (Retry)** | 콘솔/CLI로 실패 단계만 재시도 |
+| **롤백 (자동)** | V2부터 단계 수준 자동 롤백 옵션 |
+| **EventBridge → Lambda → 알림** | Slack/이메일 |
+
+### Pipeline 알림 통합
+
+| 도구 | 용도 |
+|------|------|
+| **EventBridge** | 모든 이벤트, Lambda·SQS·SNS로 |
+| **CodeStar Notifications** | 사전 정의된 채널 (SNS, AWS Chatbot) |
+| **CloudWatch** | 파이프라인 메트릭 (성공률, 지속 시간) |
+
+### Pipeline + CloudFormation 패턴
+
+```
+[CodePipeline]
+  Source: CFN 템플릿 + 앱 코드
+  Build: 검증 (cfn-lint, taskcat)
+  Deploy CFN to Staging
+  Test 단계: 통합 테스트
+  Deploy CFN to Prod
+```
+
+### Step Functions 액션 (시험 신규)
+
+CodePipeline에 Step Functions State Machine을 액션으로 등록 → 복잡한 배포 워크플로 가능 (병렬·조건·승인 등).
+
+### 관련 서비스 Cross-Reference
+
+- **CodeArtifact** → 패키지 저장소 (CodeBuild가 풀)
+- **AppConfig** → 런타임 설정 점진 배포 (Lambda·EC2·ECS)
+- **Service Catalog** → IaC 카탈로그
+- **EventBridge** → [Week 11 Day 3]
+
+---
+
 ## 아키텍처 다이어그램
 
 ```

@@ -126,6 +126,112 @@ env:
 
 ---
 
+## 🧠 알아두면 좋은 심화 이론
+
+### CodeCommit 알아두면 좋은 점
+
+> ⚠️ **함정**: 2024년 7월 이후 **신규 고객 CodeCommit 사용 불가** (기존 고객만 유지). 시험엔 여전히 출제됨 — 동작 원리는 알아둘 것.
+
+### Git 자격증명 도우미 vs SSH vs Git 자격증명 (시험 자주)
+
+| 방법 | 토큰 갱신 | 사용 사례 |
+|------|----------|-----------|
+| **SSH 키** | 영구 | 일반 개인용 |
+| **Git Credentials** (HTTPS) | 영구 (사용자별 2쌍 한도) | 간단한 클라이언트 |
+| **Credential Helper** (HTTPS) | 매번 SigV4 서명 | EC2/Lambda 인스턴스 자동 인증 |
+
+### CodeBuild 빌드 환경 (시험 가끔)
+
+| 항목 | 값 |
+|------|-----|
+| 컴퓨팅 유형 | small / medium / large / 2xlarge / Lambda |
+| 메모리 | 3GB ~ 145GB |
+| vCPU | 2 ~ 72 |
+| 환경 | Ubuntu, Amazon Linux, Windows |
+| Docker 지원 | privileged mode 활성화 필요 |
+| VPC | 사설 리소스(RDS 등) 접근 시 VPC 연결 |
+
+### buildspec.yml 핵심 섹션 (시험 매우 빈출)
+
+```yaml
+version: 0.2
+
+env:
+  variables: { KEY: VALUE }
+  parameter-store: { KEY: /path }
+  secrets-manager: { KEY: secret-name }
+  exported-variables: [ KEY ]    # 다음 단계로 전달
+
+phases:
+  install:      # 의존성 설치, 런타임 버전
+  pre_build:    # 빌드 전 (로그인, 검증)
+  build:        # 실제 빌드
+  post_build:   # 빌드 후 (푸시, 알림)
+
+artifacts:
+  files: [ "**/*" ]
+  base-directory: dist
+  discard-paths: yes
+  
+reports:                          # 테스트 리포트
+  TestReport:
+    files: ['**/*']
+    base-directory: 'test-results'
+    file-format: 'JUNITXML'
+
+cache:                            # 빌드 캐시
+  paths:
+    - 'node_modules/**/*'
+```
+
+### CodeBuild Local 모드 (실무 + 시험 가끔)
+
+- `codebuild_build.sh` 스크립트로 로컬에서 빌드 환경 재현
+- 빌드 비용 ↓, 빠른 디버깅
+- 시험에 "buildspec.yml 디버깅 빠르게" → Local Mode
+
+### 빌드 캐시 종류
+
+| 유형 | 위치 | 특징 |
+|------|------|------|
+| **Amazon S3** | S3 버킷 | 영구, 다중 빌드 공유 |
+| **Local Cache** | 빌드 호스트 | 같은 호스트 재사용 시만 |
+| **No Cache** | - | 매번 새로 |
+
+### CodeBuild Reports (테스트 결과)
+
+- JUnitXML, Cucumber JSON, TestNG, NUnit, Visual Studio TRX 지원
+- 콘솔에서 시각화
+- 보존: 30일 (기본)
+
+### Build Badges
+
+- 마크다운 README에 빌드 상태 표시
+- `https://aws-codesuite-readme-region.s3.region.amazonaws.com/...`
+
+### CodeBuild Triggers
+
+- Webhook (GitHub/Bitbucket): push, PR, tag 이벤트
+- EventBridge 스케줄: cron으로 정기 빌드
+- 수동: 콘솔/CLI
+
+### CodeCommit Triggers vs Notifications (시험에 한 번씩)
+
+| 구분 | Triggers | Notifications |
+|------|----------|---------------|
+| 대상 | SNS, Lambda | SNS, AWS Chatbot (Slack) |
+| 필터 | 분기·경로 매칭 | 이벤트 유형 |
+| 횟수 한도 | 저장소당 10개 | 무제한 |
+
+### 관련 서비스 Cross-Reference
+
+- **CodeArtifact** → npm/maven/PyPI 호환 패키지 저장소 (사설 패키지)
+- **ECR** → Docker 이미지 → [Week 12 Day 3]
+- **CodeGuru** → 코드 리뷰·성능 자동 분석
+- **CodeWhisperer** → AI 코드 자동 완성
+
+---
+
 ## 아키텍처 다이어그램
 
 ```

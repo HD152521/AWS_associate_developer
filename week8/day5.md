@@ -72,6 +72,66 @@ Beanstalk:
 
 ---
 
+## 🧠 Week 8 시험 함정 & 약어
+
+### 헷갈리는 비교
+
+| A | B | 핵심 |
+|---|---|------|
+| CodeCommit | GitHub | 프라이빗·IAM vs 공개 가능·OAuth |
+| buildspec.yml | appspec.yml | CodeBuild vs CodeDeploy |
+| install | pre_build | 의존성 vs 빌드 전 작업 |
+| In-Place | Blue/Green | EC2 같은 인스턴스 vs 새 환경 |
+| AllAtOnce | OneAtATime | 빠름·위험 vs 느림·안전 |
+| Canary | Linear | 한 번에 일부+5분 후 100% vs 점진적 |
+| Lambda Canary | Lambda AllAtOnce | 두 버전 분할 vs 즉시 |
+| ECS In-Place | ECS Blue/Green | 미지원 vs 유일 옵션 |
+| Beanstalk Rolling | Immutable | 같은 ASG vs 새 ASG |
+| Beanstalk Web | Worker | ALB·요청 vs SQS·백그라운드 |
+| Manual Approval | EventBridge | 사람 승인 vs 자동 알림 |
+| CodePipeline V1 | V2 | 단순 vs 변수·필터·실행 모드 |
+| CodeArtifact | CodeCommit | 패키지 저장소 vs 소스 코드 |
+| Trigger | Notification | SNS·Lambda vs Chatbot·Slack |
+| .ebextensions | .platform | AL1 vs AL2/AL2023 |
+
+### Week 8 시험 함정 15가지
+
+1. **EC2는 CodeDeploy Agent 필수**
+2. **ECS는 Blue/Green만**
+3. **Lambda 배포 전략 5종 이름 정확히** (Canary10Percent + 시간)
+4. **CodeBuild buildspec.yml 순서**: install → pre_build → build → post_build
+5. **CodeBuild 환경 변수**: variables / parameter-store / secrets-manager
+6. **CodeBuild Docker 빌드** → privileged mode 활성화 필수
+7. **CodePipeline 단계 간 데이터 = S3 아티팩트**
+8. **Beanstalk Immutable = 새 ASG**
+9. **Beanstalk Worker = SQS + 에이전트**
+10. **Beanstalk 환경 안 RDS는 환경 삭제 시 함께 삭제 위험**
+11. **CodeCommit 2024년 7월 이후 신규 가입 불가** (시험에는 여전히)
+12. **CodeDeploy Lambda 자동 롤백 = CloudWatch Alarm 위반**
+13. **appspec.yml 라이프사이클 훅** EC2: 10단계, Lambda: 2단계
+14. **Manual Approval 7일 응답 없으면 자동 거부**
+15. **Cross-Account 배포 = 대상 계정 IAM 역할 + PassRole**
+
+### Week 8 약어 정리
+
+| 약어 | 풀네임 |
+|------|--------|
+| **CI / CD** | Continuous Integration / Delivery / Deployment |
+| **IaC** | Infrastructure as Code |
+| **PaaS** | Platform as a Service (Beanstalk) |
+| **SaaS / IaaS** | Software / Infrastructure as a Service |
+| **CFN** | CloudFormation |
+| **EB** | Elastic Beanstalk |
+| **SDLC** | Software Development Life Cycle |
+| **MTTR / MTBF** | Mean Time To Recovery / Between Failures |
+| **DORA** | DevOps Research and Assessment (4 metrics) |
+| **CodeBuild** | aws/codebuild/* 이미지 |
+| **AMI** | Amazon Machine Image (Beanstalk가 사용) |
+| **ASG** | Auto Scaling Group |
+| **JIT** | Just-In-Time (배포) |
+
+---
+
 ## 📝 Week 8 종합 연습문제
 
 **문제 1.** buildspec.yml의 단계 순서는?
