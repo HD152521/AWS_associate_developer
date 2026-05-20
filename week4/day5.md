@@ -242,6 +242,63 @@ sam build && sam deploy --guided
 
 ---
 
+## 🧠 Week 4 시험 함정 & 약어
+
+### API Gateway 헷갈리는 비교
+
+| A | B | 핵심 |
+|---|---|------|
+| REST API | HTTP API | 기능 완비·비쌈 vs 저렴·단순 |
+| Lambda Proxy | Lambda (non-proxy) | 변환 X vs VTL 필수 |
+| Edge-Optimized | Regional | CloudFront 자동 vs 직접 |
+| Edge-Optimized | Private | 전 세계 vs VPC 내부 |
+| API Key | 인증 | 사용량 추적 vs 신원 검증 |
+| Cognito Authorizer | Lambda Authorizer | JWT 자동 vs 커스텀 로직 |
+| TOKEN Authorizer | REQUEST Authorizer | Authorization 헤더만 vs 다중 입력 |
+| Stage Variable | 환경 변수 (Lambda) | API GW에서 백엔드 분기 vs Lambda 내부 |
+| Method Response | Integration Response | 클라이언트용 vs Lambda 결과 매핑 |
+| Latency | IntegrationLatency | 전체 vs 백엔드만 |
+| Caching at Stage | Caching at Method | 전역 vs 개별 |
+| WebSocket | SSE | 양방향 vs 단방향 |
+| Payload v1.0 | Payload v2.0 | REST 호환 vs HTTP API 신형 |
+
+### Week 4 시험 함정 12가지
+
+1. **변경 후 배포 안 하면 적용 X**
+2. **API 키는 인증이 아님** — 사용량 플랜과 함께
+3. **Edge-Optimized 인증서는 us-east-1 ACM 강제**
+4. **WAF는 REST API만 직접 지원** (HTTP는 CloudFront 우회)
+5. **HTTP API에 캐싱·X-Ray·요청 검증 없음**
+6. **HTTP API Payload 2.0 = REST와 다른 이벤트 구조**
+7. **Lambda Authorizer 결과 캐시 = 토큰 단위** (다른 사용자 영향 X)
+8. **WebSocket 메시지 ↔ 회신은 post_to_connection** (응답이 아님)
+9. **WebSocket idle timeout = 10분, 연결 max = 2시간**
+10. **CORS는 Lambda Proxy + REST면 Lambda가 직접 헤더 추가**
+11. **명시적 Deny 자동 캐시 안됨 — Lambda Authorizer Deny도 캐시됨, 주의**
+12. **Cache InvalidateCache는 IAM 권한 필요** (no auth면 무력화 가능)
+
+### Week 4 약어 정리
+
+| 약어 | 풀네임 |
+|------|--------|
+| **REST** | Representational State Transfer |
+| **VTL** | Velocity Template Language |
+| **JWT** | JSON Web Token |
+| **OIDC** | OpenID Connect |
+| **OAuth** | (인가 프로토콜) |
+| **SigV4** | AWS Signature Version 4 |
+| **CORS** | Cross-Origin Resource Sharing |
+| **WAF** | Web Application Firewall |
+| **mTLS** | Mutual TLS |
+| **SSE** | Server-Sent Events |
+| **RPS** | Requests Per Second |
+| **WS** | WebSocket |
+| **ACM** | AWS Certificate Manager |
+| **NLB / ALB** | Network/Application Load Balancer |
+| **VPC Link** | API GW ↔ 사설 자원 연결 |
+
+---
+
 ## 📝 Week 4 종합 연습문제
 
 **문제 1.** API Gateway Lambda Proxy 통합에서 Lambda 응답에 반드시 포함해야 하는 항목은?

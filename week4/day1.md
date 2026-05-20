@@ -94,6 +94,103 @@ arn:aws:lambda:${stageVariables.region}:123:function:MyFunc:${stageVariables.lam
 
 ---
 
+## 🧠 알아두면 좋은 심화 이론
+
+### 엔드포인트 유형 3종 비교 (시험 빈출)
+
+| 유형 | 동작 | 사용 사례 |
+|------|------|-----------|
+| **Edge-Optimized** | CloudFront 엣지 경유 | 글로벌 사용자 |
+| **Regional** | 리전 직접 호출 | 같은 리전 클라이언트 (Lambda, EC2) |
+| **Private** | VPC 내부에서만 접근 (Interface Endpoint) | 내부 API |
+
+> ⚠️ **함정**: Edge-Optimized는 CloudFront 사용하지만, **CloudFront 콘솔에는 안 보임**. AWS 관리형. 별도 CloudFront 만들고 싶으면 **Regional + 자체 CloudFront** 패턴 사용.
+
+### API 유형 3종 핵심 비교 (시험 핵심)
+
+| 항목 | REST API | HTTP API | WebSocket API |
+|------|----------|----------|----------------|
+| 가격 | 비쌈 | **70% 저렴** | 메시지·연결 시간 과금 |
+| 지연 시간 | 보통 | **낮음** | - |
+| 통신 | 요청-응답 | 요청-응답 | 양방향 |
+| 권한 부여 | IAM/Lambda/Cognito | IAM/Lambda/**JWT 내장** | IAM/Lambda |
+| API 키·사용량 플랜 | ✅ | ❌ | ❌ |
+| 캐싱 | ✅ | ❌ | - |
+| 요청 검증 (Model) | ✅ | ❌ | ❌ |
+| WAF 통합 | ✅ | ❌ | ❌ |
+| X-Ray | ✅ | ❌ | ❌ |
+| 사용자 도메인 | ✅ | ✅ | ✅ |
+| 비공개 통합 (VPC Link) | ✅ NLB | ✅ ALB/NLB/Cloud Map | ❌ |
+| Edge-Optimized | ✅ | ❌ Regional만 | ❌ Regional만 |
+
+> 💡 **시험 키워드 → 선택**:
+> - "비용 최소화 + 단순 Lambda 호출" → **HTTP API**
+> - "API 키·사용량 플랜·WAF" → **REST API**
+> - "실시간 채팅" → **WebSocket API**
+
+### Custom Domain (사용자 도메인) 설정
+
+```
+api.mycompany.com (Route 53 A 레코드)
+        ↓
+Custom Domain Name (API GW에 등록)
+        ↓ Base Path Mapping
+[ /v1   → REST API "main" stage "prod" ]
+[ /beta → HTTP API "beta" stage "$default" ]
+```
+
+| 도메인 유형 | 인증서 위치 | 비고 |
+|-----------|------------|------|
+| **Edge-Optimized** | `us-east-1`의 ACM | CloudFront 강제 |
+| **Regional** | **각 리전의 ACM** | 인증서 발급 위치 주의 |
+
+> ⚠️ **함정**: Edge-Optimized 도메인은 ACM 인증서를 **반드시 us-east-1**에서 발급해야 함. CloudFront 동일 제약. 시험에서 "도메인이 동작 안 함" 시나리오 → 인증서 리전 확인.
+
+### OpenAPI(Swagger) Import / Export
+
+- REST API와 HTTP API 모두 OpenAPI 3.0 import/export 지원
+- 시험 시나리오: "API 정의를 코드로 관리" → OpenAPI YAML + CI/CD
+
+### 스테이지 변수 활용 패턴
+
+```
+Lambda ARN: arn:aws:lambda:region:acc:function:f:${stageVariables.alias}
+
+스테이지 dev  → alias=dev  → Lambda v$LATEST
+스테이지 prod → alias=prod → Lambda v3 (별칭이 가리킴)
+```
+
+스테이지 변수 → HTTP 통합 URL, AWS 서비스 ARN, Lambda alias 모두 동적 치환 가능.
+
+### Canary 배포 (REST API 내장 기능)
+
+REST API 스테이지에 **카나리** 활성화 → 새 배포의 일부 트래픽만 카나리로 보내고, 측정 후 전체 승격.
+
+```bash
+aws apigateway update-stage \
+  --rest-api-id abc --stage-name prod \
+  --patch-operations 'op=replace,path=/canarySettings/percentTraffic,value=10'
+```
+
+### 가격 모델 핵심 (시험 가끔)
+
+| API 유형 | 요금 |
+|----------|------|
+| REST API | $3.50/100만 호출 |
+| HTTP API | $1.00/100만 호출 (≈70% ↓) |
+| WebSocket | $1.00/100만 메시지 + 분당 연결 시간 |
+| 캐싱 | 0.5~237 GB 시간당 추가 |
+
+### 관련 서비스 Cross-Reference
+
+- **Lambda 통합** → [Week 3]
+- **Cognito 권한 부여자** → [Week 9 Day 3]
+- **CloudFront ↔ Edge-Optimized 엔드포인트**
+- **WAF ↔ REST API** → [Week 9 Day 4]
+- **CloudFormation / SAM** → [Week 12 Day 5]
+
+---
+
 ## 아키텍처 다이어그램
 
 ```

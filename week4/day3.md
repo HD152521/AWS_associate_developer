@@ -86,6 +86,112 @@ def generate_policy(principal_id, effect, resource):
 
 ---
 
+## 🧠 알아두면 좋은 심화 이론
+
+### 권한 부여(Authorization) 방법 5종 비교 (시험 매우 빈출)
+
+| 방법 | 구현 | 사용 사례 |
+|------|------|-----------|
+| **None** | 인증 없음 | 공개 엔드포인트 (헬스체크) |
+| **IAM (SigV4)** | AWS 자격증명 서명 | 다른 AWS 서비스/Lambda가 호출 |
+| **Lambda Authorizer (TOKEN)** | `Authorization` 헤더 → Lambda | 외부 JWT, OAuth |
+| **Lambda Authorizer (REQUEST)** | 헤더+쿼리+경로 모두 검사 | 멀티 헤더 검증 |
+| **Cognito User Pool Authorizer** | JWT 자동 검증 | 자체 사용자 풀 |
+| **JWT Authorizer (HTTP API 전용)** | OIDC 토큰 검증 (Cognito/Auth0/Okta) | 표준 OIDC |
+| **API Key** | 인증 X, 식별·사용량 추적 | 파트너 API |
+
+> ⚠️ **함정**: "API 키 = 인증" → 틀림. API 키는 사용량 추적 + 사용량 플랜 적용용. 보안 목적은 위의 인증 방식과 함께 사용.
+
+### Lambda Authorizer 결과 캐싱 (시험 출제)
+
+- 기본 TTL 300초 (0~3600초 설정 가능)
+- TOKEN: 토큰 값을 캐시 키로 사용
+- REQUEST: 캐시 키를 명시적으로 지정 (헤더·쿼리 조합)
+- 캐시 비활성화: TTL=0
+
+### 리소스 정책 (Resource Policy) - REST API만
+
+```json
+{
+  "Version": "2012-10-17",
+  "Statement": [{
+    "Effect": "Allow",
+    "Principal": "*",
+    "Action": "execute-api:Invoke",
+    "Resource": "execute-api:/*/*/*",
+    "Condition": {
+      "IpAddress": { "aws:SourceIp": ["203.0.113.0/24"] }
+    }
+  }]
+}
+```
+
+용도:
+- 특정 VPC/VPC Endpoint에서만 호출 허용
+- IP 화이트리스트
+- 교차 계정 API 호출
+
+### mTLS (Mutual TLS) - REST/HTTP API 모두 지원
+
+- 클라이언트 인증서 검증 (B2B, IoT 디바이스 인증)
+- Trust Store(S3)에 신뢰할 CA 인증서 업로드
+- Custom Domain에 활성화
+
+### WAF 통합 (REST API + Edge/Regional)
+
+- AWS WAF Web ACL을 API Gateway에 연결
+- SQL 인젝션, XSS, IP 차단, Rate-based rule 등
+- **HTTP API에는 WAF 직접 지원 X** → CloudFront 앞단으로 우회
+
+### 캐싱 디테일 (자주 출제)
+
+| 항목 | 값 |
+|------|-----|
+| 캐시 크기 | 0.5GB ~ 237GB |
+| TTL | 0초 ~ 3,600초 (기본 300초) |
+| 캐시 키 | 메서드 파라미터 (path/query/header) |
+| 무효화 헤더 | `Cache-Control: max-age=0` (호출자가) |
+| 무효화 IAM 권한 | `execute-api:InvalidateCache` 필요 |
+| 암호화 | 저장 시 암호화 옵션 |
+
+> ⚠️ **함정**: 누구나 `max-age=0` 보내서 캐시 무력화하면 의미 없음. 따라서 **IAM 권한으로 InvalidateCache 권한 부여 + 응답 헤더 X-Cache-Status 검사** 필요.
+
+### 스로틀링 단계 (Hierarchical Throttling)
+
+```
+1. 계정 전체 한도 (리전당 10,000 RPS)
+        ↓ (초과 시 429)
+2. 스테이지 한도 (스테이지 전체에 설정)
+        ↓ (초과 시 429)
+3. 메서드 한도 (특정 메서드만)
+        ↓ (초과 시 429)
+4. 사용량 플랜 한도 (API 키별)
+        ↓ (초과 시 429)
+백엔드 호출
+```
+
+> 💡 **버스트 vs Rate**: Token Bucket 방식. Rate=초당 평균, Burst=순간 최대.
+
+### 로깅·모니터링 (Troubleshooting 도메인)
+
+| 도구 | 용도 |
+|------|------|
+| **CloudWatch Logs** | 액세스 로그, 실행 로그 (INFO/ERROR 두 단계) |
+| **CloudWatch Metrics** | Count, 4XXError, 5XXError, Latency, IntegrationLatency, CacheHit/Miss |
+| **X-Ray** | 분산 트레이싱 (REST API만) |
+
+> 💡 **Latency vs IntegrationLatency**: Latency = 전체, IntegrationLatency = 백엔드만. 차이가 크면 API GW 자체에서 느려진 것.
+
+### 관련 서비스 Cross-Reference
+
+- **Cognito 사용자 풀** → [Week 9 Day 3]
+- **WAF / Shield** → [Week 9 Day 4]
+- **CloudWatch Logs/Metrics** → [Week 10 Day 1·2]
+- **X-Ray** → [Week 10 Day 3]
+- **KMS for API key encryption** → [Week 9 Day 1]
+
+---
+
 ## 아키텍처 다이어그램
 
 ```

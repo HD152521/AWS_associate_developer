@@ -110,6 +110,119 @@ client.post_to_connection(
 
 ---
 
+## 🧠 알아두면 좋은 심화 이론
+
+### WebSocket 핵심 동작 (시험 시나리오 자주 출제)
+
+```
+연결 단계:
+1. 클라이언트가 wss://xxx.execute-api.region.amazonaws.com/stage 에 연결
+2. API GW가 connectionId 생성
+3. $connect 라우트 → Lambda → 200이면 연결 완료, 4XX/5XX면 거부
+
+메시지 단계:
+4. 클라이언트가 JSON 메시지 송신 → routeSelectionExpression으로 라우팅
+5. 매칭되는 라우트의 Lambda 실행
+6. 응답을 보내려면 ApiGatewayManagementApi.post_to_connection() 호출
+
+해제 단계:
+7. 클라이언트가 끊거나 idle timeout(10분 기본)
+8. $disconnect 라우트 → Lambda → 정리 작업
+```
+
+### Route Selection Expression - 메시지 라우팅 (시험 가끔)
+
+```json
+// 클라이언트 메시지
+{ "action": "sendMessage", "data": "hi" }
+
+// API GW 설정
+routeSelectionExpression: "$request.body.action"
+// → "sendMessage" 라우트로 라우팅
+```
+
+### WebSocket Connection 한도
+
+- 클라이언트당 연결 시간 최대 **2시간**
+- Idle timeout: **10분** (메시지/Ping 없을 시 끊김)
+- 단일 메시지 최대 **128KB**, 32KB 단위로 청크 분할
+- 연결 수: 계정·리전당 적용
+
+### HTTP API 페이로드 버전 (시험 함정)
+
+| 버전 | 이벤트 형식 |
+|------|------------|
+| **1.0** | REST API와 동일 (Lambda Proxy 형식) |
+| **2.0** (기본) | 더 간결, `version: "2.0"`, `routeKey` 등 신규 필드 |
+
+> ⚠️ **함정**: 기존 REST API Lambda를 HTTP API에 그대로 붙이면 이벤트 구조 달라서 깨짐. 페이로드 버전 1.0 강제 또는 Lambda 코드 수정.
+
+### HTTP API JWT Authorizer (네이티브 지원)
+
+```yaml
+Authorizer:
+  Type: JWT
+  IdentitySource: $request.header.Authorization
+  IssuerUrl: https://cognito-idp.region.amazonaws.com/{userPoolId}
+  Audience: [ "my-client-id" ]
+```
+
+Cognito·Auth0·Okta 등 OIDC 호환 IDP의 JWT를 코드 없이 자동 검증.
+
+### Server-Sent Events vs WebSocket (실무 비교)
+
+| 항목 | WebSocket | SSE (Server-Sent Events) |
+|------|-----------|--------------------------|
+| 방향 | 양방향 | 서버 → 클라이언트만 |
+| 프로토콜 | ws://, wss:// | HTTP 표준 |
+| AWS 지원 | WebSocket API | Lambda Response Streaming + Function URL |
+| 사용 | 채팅, 게임 | LLM 응답 스트리밍, 알림 |
+
+> 💡 실시간 알림만 필요(서버→클라이언트)면 SSE가 더 간단하고 저렴.
+
+### HTTP API 통합 추가 - VPC Link로 사설 ALB
+
+```
+HTTP API → VPC Link → 사설 ALB / NLB / Cloud Map → ECS/Fargate/EC2 (사설 서브넷)
+```
+
+REST API는 NLB만, HTTP API는 ALB/NLB/Cloud Map 모두 지원.
+
+### Connection 관리 패턴 (실무)
+
+```
+DynamoDB Connections 테이블
+  connectionId (PK) | userId (GSI) | joinedAt
+  
+$connect:    INSERT
+$disconnect: DELETE
+broadcast:   query GSI by chatRoomId → post_to_connection each
+```
+
+- **TTL** 활성화로 끊긴 연결 자동 정리
+- `GoneException`: 이미 끊긴 연결 → DDB에서 즉시 삭제
+
+### Lambda Function URL vs API Gateway HTTP API
+
+| 항목 | Function URL | HTTP API |
+|------|--------------|----------|
+| 비용 | 무료 (Lambda 요금만) | $1/100만 호출 |
+| 도메인 | aws 제공 | 커스텀 도메인 가능 |
+| 라우팅 | 단일 함수 | 여러 라우트 |
+| Authorization | NONE / AWS_IAM | JWT / IAM / Lambda |
+| Streaming | ✅ | ❌ |
+
+> 시나리오: "단일 Lambda 단순 HTTPS 노출" → Function URL이 더 단순·저렴.
+
+### 관련 서비스 Cross-Reference
+
+- **DynamoDB TTL** → [Week 6 Day 4]
+- **Cognito + JWT** → [Week 9 Day 3]
+- **Lambda Response Streaming** → [Week 3 Day 1]
+- **AppSync (GraphQL)** → 시험엔 거의 안 나오지만 실시간 GraphQL 대안
+
+---
+
 ## 아키텍처 다이어그램
 
 ```

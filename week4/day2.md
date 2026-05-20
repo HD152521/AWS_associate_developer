@@ -104,6 +104,116 @@ Lambda Proxy 제외 통합에서 요청/응답을 변환하는 VTL(Velocity Temp
 
 ---
 
+## 🧠 알아두면 좋은 심화 이론
+
+### Lambda Proxy 이벤트 구조 (외워두면 시험 + 실무 모두 OK)
+
+```json
+{
+  "resource": "/users/{userId}",
+  "path": "/users/123",
+  "httpMethod": "GET",
+  "headers": { "Authorization": "Bearer xxx" },
+  "queryStringParameters": { "filter": "active" },
+  "pathParameters": { "userId": "123" },
+  "stageVariables": { "env": "prod" },
+  "requestContext": {
+    "identity": { "sourceIp": "203.0.113.1" },
+    "authorizer": { "userId": "abc", "scope": "read:users" }
+  },
+  "body": "{...}",
+  "isBase64Encoded": false
+}
+```
+
+> ⚠️ **함정**: `body`는 **항상 문자열**. JSON 파싱은 Lambda가 직접 해야 함. 바이너리는 base64 인코딩.
+
+### VTL 매핑 템플릿 핵심 변수 (시험 가끔)
+
+| 변수 | 의미 |
+|------|------|
+| `$input.body` | 요청 본문 원본 |
+| `$input.json('$.field')` | JSONPath로 필드 추출 |
+| `$input.params('name')` | 헤더/경로/쿼리 파라미터 |
+| `$context.identity.sourceIp` | 클라이언트 IP |
+| `$context.requestId` | 요청 ID |
+| `$context.authorizer.claims.sub` | Cognito 토큰의 sub |
+| `$util.escapeJavaScript()` | JS 이스케이프 |
+| `$util.base64Encode()` | Base64 인코딩 |
+| `$stageVariables.<name>` | 스테이지 변수 |
+
+### Lambda Proxy vs Lambda(non-proxy) 선택 기준
+
+| 항목 | Proxy (AWS_PROXY) | non-Proxy (AWS) |
+|------|-------------------|-----------------|
+| 변환 | 없음 | VTL 필수 |
+| 응답 형식 | Lambda가 statusCode 설정 | API GW가 상태 매핑 |
+| 디버깅 | 단순 | 복잡 |
+| 사용 | **99% 이 방식** | 레거시 통합·세밀 제어 |
+
+### Method Response vs Integration Response (non-proxy)
+
+```
+Integration Response (Lambda 결과)
+       ↓ Selection Pattern (정규식)
+       ↓
+Method Response (HTTP 응답)
+   → statusCode (200/400/500)
+   → 헤더
+   → body 모델
+```
+
+> 시험: Lambda가 에러 throw → Integration Response에서 정규식으로 `4XX/5XX` 매핑 → Method Response로 HTTP 코드 변환.
+
+### Gateway Response (커스텀 에러 응답)
+
+기본 에러(API GW가 자체 생성)도 커스터마이즈 가능. 예: 401 Unauthorized → CORS 헤더 추가, JSON 형식 통일.
+
+```
+지원 응답 타입:
+- ACCESS_DENIED
+- API_CONFIGURATION_ERROR
+- AUTHORIZER_FAILURE
+- DEFAULT_4XX, DEFAULT_5XX
+- MISSING_AUTHENTICATION_TOKEN
+- THROTTLED
+- UNAUTHORIZED
+```
+
+### Binary Media Types (시험 가끔)
+
+API Gateway는 기본적으로 JSON만 처리. 이미지·PDF 등 바이너리 처리하려면:
+1. 스테이지에 Binary Media Types 등록 (`image/*`, `application/pdf` 등)
+2. Lambda가 `isBase64Encoded: true`로 응답
+3. API GW가 자동으로 base64 디코드 후 반환
+
+### CORS 처리 (시험 빈출 함정)
+
+| 방식 | OPTIONS 처리 | CORS 헤더 위치 |
+|------|--------------|----------------|
+| **HTTP API** | 자동 (CORS 설정만 하면 됨) | API GW가 추가 |
+| **REST API + Lambda Proxy** | 수동 (OPTIONS 메서드 직접 추가 + Mock) | **Lambda 응답에 포함 필수** |
+| **REST API + non-proxy** | 콘솔의 "Enable CORS" 버튼 | API GW가 자동 추가 |
+
+> ⚠️ **함정**: Lambda Proxy + REST API 조합에서 CORS 동작 안 함 → 90% Lambda가 헤더 빠뜨림. 추가로 OPTIONS preflight 처리 필요.
+
+### Mock 통합 활용
+
+- 백엔드 없이 응답 반환
+- 사용 사례:
+  - 개발 초기 프론트엔드 작업
+  - CORS preflight(OPTIONS) 응답
+  - Health check `/health` 엔드포인트
+
+### 관련 서비스 Cross-Reference
+
+- **VPC Link** → 프라이빗 ALB/NLB로 라우팅
+- **Step Functions Express** → API GW에서 직접 호출 (Lambda 우회)
+- **DynamoDB 직접 통합 + VTL** → Lambda 없이 CRUD (비용 최적화)
+- **Kinesis Data Streams 직접 통합** → 이벤트 수집 API
+
+---
+
 ## 아키텍처 다이어그램
 
 ```
