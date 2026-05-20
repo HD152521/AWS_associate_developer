@@ -124,6 +124,111 @@ s3 = boto3.client(
 
 ---
 
+## 🧠 알아두면 좋은 심화 이론
+
+### JWT 토큰 3종 (시험 빈출 - 정확히)
+
+| 토큰 | 용도 | 만료 |
+|------|------|------|
+| **ID Token** | 사용자 정보 (sub, email, name) | 1시간 (기본) |
+| **Access Token** | API 접근·OAuth scope | 1시간 (기본) |
+| **Refresh Token** | ID/Access 갱신 | 30일 (1일~10년 설정) |
+
+```python
+# JWT 구조 (Header.Payload.Signature)
+{
+  "header": { "alg": "RS256", "kid": "abc" },
+  "payload": {
+    "sub": "user-uuid",
+    "email": "user@example.com",
+    "cognito:groups": ["Admin"],
+    "iss": "https://cognito-idp.region.amazonaws.com/userPoolId",
+    "aud": "appClientId",
+    "exp": 1721000000
+  },
+  "signature": "..."
+}
+```
+
+### Cognito User Pool 인증 흐름 (Auth Flow)
+
+| 흐름 | 사용 |
+|------|------|
+| **USER_SRP_AUTH** (권장) | 비밀번호를 네트워크로 안 보냄, SRP 프로토콜 |
+| **USER_PASSWORD_AUTH** | 비밀번호 직접 전송 (TLS 필수) |
+| **ADMIN_NO_SRP_AUTH** | 백엔드에서 관리자 권한 |
+| **REFRESH_TOKEN_AUTH** | Refresh Token으로 갱신 |
+| **CUSTOM_AUTH** | 커스텀 Lambda 트리거 (MFA 외) |
+
+### MFA 옵션 (시험에 가끔)
+
+- **SMS MFA** (디플리케이트 진행 중)
+- **TOTP MFA** (Google Authenticator)
+- **WebAuthn / FIDO** (2023 신규, 패스키)
+
+### Cognito Lambda 트리거 11종 (시험 자주)
+
+| 트리거 | 시점 |
+|--------|------|
+| `PreSignUp` | 회원가입 검증 (이메일·도메인) |
+| `PostConfirmation` | 확인 후 (DB에 사용자 추가) |
+| `PreAuthentication` | 로그인 시도 시 |
+| `PostAuthentication` | 로그인 성공 후 (감사 로그) |
+| `PreTokenGeneration` | JWT 발급 전 (클레임 커스터마이즈) |
+| `DefineAuthChallenge` | 커스텀 인증 흐름 정의 |
+| `CreateAuthChallenge` | 챌린지 생성 |
+| `VerifyAuthChallengeResponse` | 챌린지 응답 검증 |
+| `UserMigration` | 다른 IDP에서 마이그레이션 |
+| `CustomMessage` | 이메일/SMS 메시지 커스텀 |
+| `CustomEmailSender / CustomSMSSender` | 외부 전송 서비스 (SES 외) |
+
+### 소셜·SAML·OIDC IDP 통합
+
+- 외부 IDP를 User Pool에 페더레이션
+- 지원: Google, Facebook, Apple, Amazon, SAML 2.0, OIDC
+- 사용자 정보가 User Pool에 미러링됨 (Just-in-time 프로비저닝)
+
+### Cognito Identity Pool 인증 흐름 (2단계)
+
+```
+1. GetId           → Identity ID 받기
+2. GetCredentialsForIdentity → STS 임시 자격증명
+                              (AccessKey + SecretKey + SessionToken)
+```
+
+- Token이 만료 전이면 Identity ID는 같음 → 같은 IAM 역할 매핑
+
+### Identity Pool 역할 매핑 (시험 가끔)
+
+| 매핑 | 동작 |
+|------|------|
+| **Default** | 인증/미인증별 단일 역할 |
+| **Rules-based** | 클레임 기반 (예: `cognito:groups: Admin` → AdminRole) |
+| **Token-based** | `cognito:preferred_role` 클레임으로 |
+
+### API Gateway + Cognito Authorizer
+
+| 항목 | REST API | HTTP API |
+|------|----------|----------|
+| 인증 | Cognito Authorizer (ID Token) | JWT Authorizer (Access Token) |
+| 캐싱 | TTL 5분 | TTL 5분 |
+| Scope 검증 | ❌ (별도 Lambda) | ✅ 내장 |
+
+> ⚠️ **함정**: REST API에 Cognito Authorizer 붙이면 기본 **ID Token** 사용. Access Token 사용하려면 추가 설정.
+
+### Cognito Sync vs AppSync vs IoT (시험엔 거의 안 나옴)
+
+- Cognito Sync는 deprecated, AppSync로 대체
+
+### 관련 서비스 Cross-Reference
+
+- **API Gateway Authorizer** → [Week 4 Day 3]
+- **STS** → [Week 1 Day 3] (Identity Pool의 backbone)
+- **ALB Authentication with Cognito** → [Week 2 Day 4]
+- **AppSync (GraphQL) + Cognito** → 실시간 앱
+
+---
+
 ## 아키텍처 다이어그램
 
 ```

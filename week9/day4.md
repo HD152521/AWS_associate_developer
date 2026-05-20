@@ -120,6 +120,113 @@ aws acm describe-certificate \
 
 ---
 
+## 🧠 알아두면 좋은 심화 이론
+
+### WAF 규칙 종류 (시험 매우 빈출)
+
+| 규칙 유형 | 예시 |
+|----------|------|
+| **IP Set** | 차단·허용 IP 목록 (CIDR) |
+| **String Match** | URL·헤더에 특정 문자열 |
+| **Regex** | 패턴 매칭 |
+| **SQLi Match** | SQL 인젝션 패턴 자동 탐지 |
+| **XSS Match** | 크로스사이트 스크립팅 |
+| **Size Constraint** | 요청 크기 제한 |
+| **Geo Match** | 국가·대륙 차단 |
+| **Rate-based** | IP당 5분간 N 요청 제한 |
+| **AWS Managed Rules** | OWASP Top 10, IP Reputation, Anonymous IP |
+
+### WAF Action 종류
+
+| Action | 동작 |
+|--------|------|
+| **Allow** | 통과 |
+| **Block** | 차단 (사용자 정의 4xx) |
+| **Count** | 카운트만 (테스트 모드) |
+| **CAPTCHA** | 사용자에게 CAPTCHA 보여줌 |
+| **Challenge** | 자바스크립트 챌린지 (봇 방지) |
+
+### WAF 적용 대상 (시험 함정)
+
+| 리소스 | 지원 | 비고 |
+|--------|------|------|
+| **CloudFront** | ✅ | Global scope (us-east-1) |
+| **ALB** | ✅ | Regional |
+| **API Gateway REST** | ✅ | Regional |
+| **API Gateway HTTP** | ❌ | (CloudFront 우회 필요) |
+| **AppSync** | ✅ | Regional |
+| **Cognito User Pool** | ✅ (2022~) | Regional |
+
+> ⚠️ **함정**: HTTP API는 WAF 직접 지원 X. NLB도 직접 지원 X.
+
+### Shield Standard vs Advanced 상세
+
+| 항목 | Standard | Advanced |
+|------|----------|----------|
+| 비용 | 무료 | $3,000/월 + 데이터 전송 |
+| 레이어 | L3/L4 (SYN/UDP 플러드) | L3/L4/L7 |
+| 보호 대상 | 모든 AWS 리소스 자동 | 명시적 등록 (CloudFront, ALB, NLB, EIP, R53) |
+| 비용 보호 | ❌ | ✅ DDoS 공격 시 발생한 비용 크레딧 |
+| DDoS 응답 팀 (SRT) | ❌ | ✅ 24/7 |
+| WAF 비용 | 별도 | ✅ 포함 |
+| 실시간 가시성 | ❌ | ✅ |
+| 보호 그룹 | ❌ | ✅ |
+
+### Firewall Manager (시험 가끔)
+
+- 여러 계정의 WAF/Shield Advanced/Security Group 중앙 관리
+- AWS Organizations 필요
+- 새 리소스에 자동으로 규칙 적용
+
+### ACM 디테일 (시험 자주)
+
+| 항목 | 내용 |
+|------|------|
+| **무료** | Public 인증서 (도메인 검증) |
+| **유료** | Private CA ($400/월) |
+| **자동 갱신** | DNS 검증·이메일 검증 (도메인 소유) |
+| **사용 가능 서비스** | CloudFront, ALB, NLB, API GW, App Mesh, App Runner, Cognito, Elastic Beanstalk |
+| **사용 불가** | **EC2 직접 설치** (개인키 export 안 됨) |
+| **리전 종속** | Regional 리소스용은 같은 리전 ACM. CloudFront는 **us-east-1** 강제 |
+
+### 도메인 검증 방식
+
+| 방식 | 속도 | 자동 갱신 |
+|------|------|----------|
+| **DNS 검증** (권장) | 빠름 | ✅ (CNAME 유지 시) |
+| **이메일 검증** | 느림 | ❌ (수동) |
+
+### Private CA (시험 가끔)
+
+- 내부 인증서 (mTLS, IoT, 내부 서비스)
+- $400/월 + 인증서당 $0.75
+- 시험 시나리오: "내부 마이크로서비스 mTLS" → ACM Private CA
+
+### Macie · GuardDuty · Inspector (시험에 가끔)
+
+| 서비스 | 용도 |
+|--------|------|
+| **Macie** | S3에 저장된 **PII 자동 탐지** (ML 기반) |
+| **GuardDuty** | 계정 활동 이상 탐지 (CloudTrail/VPC Flow Logs/DNS Logs) |
+| **Inspector** | EC2/ECR 이미지 **취약점 스캔** |
+| **Detective** | 보안 사고 조사·분석 |
+| **Security Hub** | 모든 보안 알림 통합 대시보드 |
+
+### CloudFront Field-Level Encryption (시험 가끔)
+
+- CloudFront에서 특정 필드(신용카드 번호 등)를 추가 암호화
+- 백엔드에 도달하기 전 암호화 → 데이터 유출 방어
+- 자산 → 백엔드만 복호화 가능
+
+### 관련 서비스 Cross-Reference
+
+- **WAF ↔ CloudFront / ALB / API GW REST** → 다양한 적용
+- **Shield Advanced ↔ Route 53 / EIP / Global Accelerator** → DDoS 보호 대상
+- **ACM ↔ CloudFront** → us-east-1 강제
+- **GuardDuty ↔ EventBridge** → 자동 대응 (Lambda)
+
+---
+
 ## 아키텍처 다이어그램
 
 ```

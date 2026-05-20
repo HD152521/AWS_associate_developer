@@ -75,6 +75,74 @@ Shield Advanced: DDoS 비용 크레딧 제공
 
 ---
 
+## 🧠 Week 9 시험 함정 & 약어
+
+### 헷갈리는 비교
+
+| A | B | 핵심 |
+|---|---|------|
+| AWS Managed Key | Customer Managed Key | 무료·자동 vs $1·완전 제어 |
+| Encrypt | GenerateDataKey | 4KB까지 vs 데이터 키 받아 로컬 |
+| KMS | CloudHSM | 멀티테넌트·관리형 vs 전용 HW·고객 관리 |
+| Multi-Region Key | 일반 Key | 리전 간 복호화 vs 리전 종속 |
+| Secrets Manager | Parameter Store | $0.40·자동회전 vs 무료·계층 |
+| Standard Param | Advanced Param | 4KB·무료 vs 8KB·$0.05 |
+| User Pool | Identity Pool | 인증·JWT vs IAM 임시 자격 |
+| ID Token | Access Token | 사용자 정보 vs API 접근 |
+| USER_SRP_AUTH | USER_PASSWORD_AUTH | SRP 보안 vs 비밀번호 전송 |
+| Cognito Authorizer | JWT Authorizer (HTTP API) | ID Token·REST vs Access Token·HTTP |
+| WAF Block | WAF Count | 차단 vs 카운트만 |
+| Shield Standard | Advanced | 무료·자동 vs $3000·비용보호·SRT |
+| ACM Public | Private CA | 무료·외부 vs $400/월·내부 |
+| ACM CloudFront 인증서 | ACM Regional 인증서 | us-east-1만 vs 같은 리전 |
+| Macie | GuardDuty | S3 PII vs 계정 활동 이상 |
+| WAF Single-User | Alternating-Users | 잠깐 다운타임 vs 무중단 |
+
+### Week 9 시험 함정 15가지
+
+1. **AWS Managed Key 자동 회전 = 1년** (이전 자료의 3년은 옛 정보)
+2. **KMS 4KB 한도 → 그 이상은 Envelope**
+3. **Key Policy + IAM Policy 둘 다 필요**
+4. **Multi-Region Key**는 같은 키 ID가 여러 리전
+5. **Secrets Manager 자동 회전 Single vs Alternating**
+6. **Parameter Store SecureString = KMS 암호화**
+7. **Parameter Store 표준 4KB, 고급 8KB**
+8. **Cognito Identity Pool**은 IAM 임시 자격
+9. **Cognito Authorizer 기본 ID Token** (REST), HTTP API는 Access
+10. **JWT Refresh Token 최대 10년**
+11. **PreSignUp·PreTokenGeneration 등 Lambda 트리거 11종**
+12. **WAF HTTP API 직접 지원 X**
+13. **WAF Rate-based** → 5분 단위 IP 카운트
+14. **Shield Advanced만 DDoS 비용 크레딧**
+15. **ACM은 EC2에 직접 설치 불가** + CloudFront는 **us-east-1**
+
+### Week 9 약어 정리
+
+| 약어 | 풀네임 |
+|------|--------|
+| **KMS** | Key Management Service |
+| **CMK** | Customer Master/Managed Key |
+| **DEK** | Data Encryption Key (봉투 암호화) |
+| **HSM** | Hardware Security Module |
+| **FIPS** | Federal Information Processing Standard |
+| **PII** | Personally Identifiable Information |
+| **JWT** | JSON Web Token |
+| **OIDC** | OpenID Connect |
+| **SAML** | Security Assertion Markup Language |
+| **SRP** | Secure Remote Password |
+| **MFA / TOTP** | Multi-Factor / Time-based OTP |
+| **WAF** | Web Application Firewall |
+| **DDoS** | Distributed Denial of Service |
+| **SRT** | Shield Response Team |
+| **DRT** | DDoS Response Team (구 명칭) |
+| **ACM** | AWS Certificate Manager |
+| **mTLS** | Mutual TLS |
+| **SSE / CSE** | Server / Client-Side Encryption |
+| **TDE** | Transparent Data Encryption (RDS) |
+| **IDP** | Identity Provider |
+
+---
+
 ## 📝 Week 9 종합 연습문제
 
 **문제 1.** 대용량 파일을 KMS로 암호화하는 올바른 방법은?

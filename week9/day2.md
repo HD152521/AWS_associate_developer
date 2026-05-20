@@ -120,6 +120,116 @@ aws ssm get-parameter \
 
 ---
 
+## 🧠 알아두면 좋은 심화 이론
+
+### Secrets Manager vs Parameter Store - 결정 트리 (시험 시나리오)
+
+```
+자동 회전 필요? ────── YES ────→ Secrets Manager
+                       NO
+                       ↓
+크기 > 8KB?     ────── YES ────→ Secrets Manager
+                       NO
+                       ↓
+RDS·DocDB·Redshift 통합? ──── YES ────→ Secrets Manager
+                              NO
+                              ↓
+비용 최우선?    ────── YES ────→ Parameter Store (Standard)
+                       NO
+                       ↓
+                둘 다 가능 (보통 Parameter Store)
+```
+
+### Secrets Manager 통합 자동 회전 (시험 빈출)
+
+| DB | 회전 방식 |
+|----|-----------|
+| **RDS MySQL, PostgreSQL, MariaDB** | AWS 관리 Lambda (Single-User / Alternating-Users) |
+| **RDS Oracle, SQL Server** | AWS 관리 Lambda |
+| **DocumentDB** | AWS 관리 Lambda |
+| **Redshift** | AWS 관리 Lambda |
+| **기타** | 사용자 정의 Lambda |
+
+### Rotation 두 가지 전략
+
+| 전략 | 동작 | 다운타임 |
+|------|------|----------|
+| **Single-User** | 한 사용자의 비밀번호 교체 | 짧은 순간 가능 |
+| **Alternating-Users** | 두 사용자 번갈아 (User A → User B) | **거의 없음** (권장) |
+
+### Parameter Store 디테일
+
+| 항목 | Standard | Advanced |
+|------|----------|----------|
+| 파라미터 수 | 10,000 (계정/리전당) | 100,000 |
+| 크기 | **4 KB** | **8 KB** |
+| 정책·기간 만료 | ❌ | ✅ |
+| 가격 | 무료 | $0.05/파라미터/월 |
+| API 호출 | 무료 (Throughput 옵션) | $0.005/10000 호출 |
+
+### Parameter Store 고급 - Policy
+
+- **Expiration**: 자동 삭제 (만료 시)
+- **NoChangeNotification**: 일정 기간 변경 없으면 알림
+- **ExpirationNotification**: 만료 임박 시 알림
+
+### Parameter 계층 구조 (시험에 가끔)
+
+```
+/myapp/prod/database/password
+/myapp/prod/database/host
+/myapp/prod/database/port
+/myapp/staging/database/password
+
+조회: get-parameters-by-path --path /myapp/prod
+```
+
+- IAM 정책으로 경로별 권한 분리 (`arn:aws:ssm:...:parameter/myapp/prod/*`)
+- AppConfig와 연계 가능
+
+### Public Parameters (시험에 한 번씩)
+
+```bash
+# 최신 Amazon Linux 2023 AMI ID 자동 가져오기
+aws ssm get-parameter \
+  --name /aws/service/ami-amazon-linux-latest/al2023-ami-kernel-default-x86_64
+```
+
+AWS가 제공하는 공개 파라미터: AMI ID, ECS 이미지 등.
+
+### AppConfig (시험에 가끔)
+
+- 런타임 설정 점진 배포 (Feature Flag)
+- Lambda Extension으로 설정 캐싱
+- Parameter Store/Secrets Manager와 함께 시험에 함정 옵션
+
+### Secrets Manager Replication (Cross-Region)
+
+- 비밀을 다른 리전에 복제 → 멀티 리전 워크로드
+- 자동 동기화 (Secrets Manager가 관리)
+
+### Cost 비교 (실무에서 중요)
+
+```
+Parameter Store (Standard): 무료
+Parameter Store (Advanced): $0.05/파라미터/월 + API 호출
+Secrets Manager: $0.40/비밀/월 + $0.05/10000 API 호출
+
+100개 비밀 1년:
+  Parameter Store: $0
+  Parameter Store Advanced: $60
+  Secrets Manager: $480
+```
+
+### 관련 서비스 Cross-Reference
+
+- **Lambda Extension** → 호출량 감소 + 콜드 스타트 ↓
+- **RDS 통합 자동 회전** → [Week 7 Day 2]
+- **CloudFormation Secrets Manager** → 동적 참조 (`{{resolve:secretsmanager:...}}`)
+- **CodeBuild env.secrets-manager** → [Week 8 Day 1]
+
+---
+
 ## 아키텍처 다이어그램
 
 ```

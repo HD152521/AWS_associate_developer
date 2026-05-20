@@ -130,6 +130,120 @@ aws kms get-key-rotation-status --key-id key-id
 
 ---
 
+## 🧠 알아두면 좋은 심화 이론
+
+### KMS Key 유형 정확히 (시험 함정 다수)
+
+| 유형 | 가격 | 키 정책 제어 | 자동 회전 |
+|------|------|--------------|-----------|
+| **AWS Owned Key** | 무료 | ❌ 보이지 않음 | AWS 관리 |
+| **AWS Managed Key** (`aws/<service>`) | 무료 | 보기만 가능, 수정 X | 자동 (1년 / 변경됨) |
+| **Customer Managed Key** | $1/월 + API 호출 | 완전 제어 | 옵션 (1년 자동) |
+| **Imported Key Material** | $1/월 | 일부 제어 | 불가 (재가져오기) |
+| **CloudHSM Key Store** | 별도 | 완전 제어 | - |
+
+> ⚠️ **2022년 변경**: AWS Managed Key의 자동 회전 주기가 **365일**로 변경됨 (이전 1095일/3년). 시험에 옛 자료의 "3년"은 더 이상 정답 아님.
+
+### 키 사양 (Key Spec) - 시험에 출제
+
+| Key Spec | 대칭/비대칭 | 용도 |
+|----------|------------|------|
+| `SYMMETRIC_DEFAULT` (AES-256) | 대칭 | 일반 암호화 (가장 일반적) |
+| `RSA_2048`, `RSA_3072`, `RSA_4096` | 비대칭 | 암호화·서명·검증 |
+| `ECC_NIST_P256`, `ECC_NIST_P384` | 비대칭 | 서명·검증 (암호화 불가) |
+| `HMAC_*` | HMAC | MAC 생성·검증 (2022~) |
+| `SM2` | 비대칭 (중국 표준) | 중국 리전 |
+
+### Multi-Region Keys (시험 신규)
+
+- 같은 키 ID로 여러 리전에서 사용 → 복호화 호환
+- 사용: S3 CRR, DynamoDB Global Tables, Global Active-Active
+- 일반 키는 리전에 종속 → 다른 리전에서 복호화 불가
+
+### Key Policy + IAM + Grant (3-Way 권한 모델)
+
+```
+Key Policy (필수, 키 자체에 부착)
+  ↓
+IAM Policy (별도 권한)
+  ↓
+Grant (API로 임시 권한 부여, 일회용)
+```
+
+> ⚠️ **함정**: Key Policy에 IAM root principal 허용 statement가 **없으면** IAM 권한이 효력 없음. 기본 키 정책에는 들어있지만, 커스텀 정책 만들 때 빠뜨리기 쉬움.
+
+### KMS Grant (시험 가끔 출제)
+
+- 임시·제한된 권한 (Lambda 함수가 다른 사용자 대신 일시 키 사용)
+- `CreateGrant` API
+- Key Policy 수정 없이 권한 부여
+- 사용 사례: ENI 생성 시 KMS Grant (EC2 자동)
+
+### KMS API Quota (시험 함정)
+
+- 키당 **5,500~30,000 RPS** (리전·키 타입에 따라)
+- 초과 시 throttling
+- 대응: **S3 Bucket Key**, **DAX/캐싱**, **Envelope Encryption**
+
+### 봉투 암호화 - 상세 흐름 (시험 시나리오 자주)
+
+```
+[암호화]
+1. GenerateDataKey(KeyId, Spec=AES_256)
+   → 응답: Plaintext (DEK), CiphertextBlob (암호화된 DEK)
+2. Plaintext DEK로 로컬에서 데이터 암호화
+3. Plaintext DEK 메모리 wipe
+4. 저장: [암호화된 데이터 + 암호화된 DEK]
+
+[복호화]
+1. 저장된 암호화된 DEK를 Decrypt 호출
+   → Plaintext DEK 반환
+2. Plaintext DEK로 로컬 데이터 복호화
+3. Plaintext DEK 즉시 삭제
+```
+
+### Encryption SDK (AWS Encryption SDK) - 시험에 가끔
+
+- 라이브러리로 봉투 암호화 자동 처리
+- 메시지 포맷 표준화 (헤더에 암호화된 DEK 포함)
+- Java, Python, C, JavaScript 지원
+
+### Key Aliases (시험에 가끔)
+
+```
+alias/myapp/prod  → arn:aws:kms:...:key/abc-123
+```
+
+- 가독성 + 키 교체 시 코드 변경 X
+- 한 키에 여러 alias 가능
+- AWS 서비스 키는 `alias/aws/<service>` (예: `alias/aws/s3`)
+
+### KMS 삭제 (소프트 삭제)
+
+- `ScheduleKeyDeletion` → 7~30일 후 삭제 (대기 기간)
+- 대기 중 취소 가능
+- 즉시 삭제 불가 (실수 방지)
+
+### CloudHSM vs KMS (시험 가끔 출제)
+
+| 항목 | KMS | CloudHSM |
+|------|-----|----------|
+| 관리 수준 | 완전 관리형 | 고객 관리 |
+| 키 격리 | 멀티 테넌트 (논리적) | 싱글 테넌트 (전용 HW) |
+| 표준 | FIPS 140-2 Level 2-3 | **FIPS 140-2 Level 3** |
+| API | AWS SDK | PKCS#11, JCE, KSP |
+| 비용 | 키당 $1 + API | 인스턴스당 ~$1.45/h |
+| 사용 | 일반 | 규제 강한 산업 (금융, 정부) |
+
+### 관련 서비스 Cross-Reference
+
+- **봉투 암호화 ↔ S3, EBS, RDS** → 모든 AWS 저장 암호화의 표준
+- **S3 Bucket Key** → [Week 5 Day 3] KMS 비용 99% 절감
+- **CRR + Multi-Region Key** → [Week 5 Day 2]
+- **DynamoDB ↔ KMS** → 기본적으로 AWS owned key, CMK도 선택 가능
+
+---
+
 ## 아키텍처 다이어그램
 
 ```
