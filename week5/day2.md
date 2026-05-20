@@ -75,6 +75,94 @@ DELETE 마커(ghi789)→ def456 버전 복원
 
 ---
 
+## 🧠 알아두면 좋은 심화 이론
+
+### 버전 관리 비용 함정 (실무 빈출)
+
+- 모든 버전이 **각각 저장 비용** 발생
+- 자주 변경되는 버킷은 비용 폭증 → 수명 주기 규칙으로 **이전 버전 자동 삭제** 필수
+- 삭제 마커 자체도 객체로 카운트됨
+
+```json
+"NoncurrentVersionExpiration": { "NoncurrentDays": 30 }
+"AbortIncompleteMultipartUpload": { "DaysAfterInitiation": 7 }
+```
+
+### 수명 주기 전환 규칙 (시험 함정 다수)
+
+```
+가능한 전환:
+Standard → S-IA / Intelligent-Tiering / Glacier 계열
+S-IA → Intelligent-Tiering / Glacier 계열
+Intelligent-Tiering → Glacier 계열
+Glacier IR / Flexible → Deep Archive
+
+불가능한 전환:
+S-IA → One Zone-IA (S-IA에서 One Zone-IA로만 직접 전환 가능 30일 후)
+Glacier → Standard (역방향 전환은 복원만 가능)
+Deep Archive → 그 외 (역방향 일체 불가, 복원만)
+```
+
+> ⚠️ **함정**: "Standard-IA → Intelligent-Tiering"은 가능. "Intelligent-Tiering → Standard"는 불가.
+
+### Storage Class Analysis
+
+- S3가 객체 접근 패턴 분석 → 어떤 객체를 IA로 옮길지 추천
+- Standard / Standard-IA만 지원 (Glacier 분석 X)
+
+### 복제 디테일 - 시험에 자주 출제
+
+| 항목 | 내용 |
+|------|------|
+| 복제 트리거 | PUT (기본). 메타데이터/태그 변경도 옵션 |
+| 복제 미대상 | SSE-C 암호화 객체, 일부 기존 객체 |
+| 삭제 마커 복제 | 옵션 (기본 OFF, 활성화 시 양방향 위험) |
+| 삭제 자체 복제 | ❌ — 데이터 보존 목적 |
+| 양방향 복제 | 2019부터 지원 (활성/활성 시나리오) |
+| 비용 | 데이터 복제·요청·교차 리전 데이터 전송 |
+| 권한 | IAM 역할 + 소스에 GetObject, 대상에 ReplicateObject |
+
+### Replication Time Control (RTC) - 보장 SLA
+
+- 99.99%의 객체를 **15분 이내** 복제 보장
+- 추가 비용 + Replication Metrics 자동 활성화
+- 시험에 가끔: "복제 SLA가 필요한 시나리오" → RTC
+
+### Cross-Account Replication
+
+- 대상 버킷이 다른 계정에 있을 때 객체 소유권 변경 옵션 (대상 계정으로 이전)
+- Object Ownership 설정 변경 → bucket-owner-full-control
+
+### Object Lock - 규정 준수
+
+- WORM (Write Once Read Many): 객체 보존 → 삭제·수정 불가
+- 모드:
+  - **Governance Mode**: IAM 권한 있으면 변경 가능
+  - **Compliance Mode**: 누구도(root조차) 변경 불가, 지정 기간 종료까지
+- **Legal Hold**: 기간 무관 보존 ↔ 명시적 해제 필요
+- 활성화: **버킷 생성 시에만** 활성화 가능 (이후 추가 불가)
+
+### S3 Inventory
+
+- S3 객체 목록을 CSV/Parquet 형식으로 정기적으로 출력
+- 빌링·감사·암호화 상태 확인용
+- 시험 시나리오: "수십억 객체 메타데이터를 효율적으로 조사" → S3 Inventory + Athena
+
+### S3 Batch Operations - 대량 작업
+
+- 수십억 객체에 일괄 작업: 복사, 태그, ACL, 객체 잠금, Lambda 호출
+- 입력: S3 Inventory 결과 또는 manifest
+- 시험에 가끔: "기존 객체 1억 개 암호화 적용" → Batch Operations
+
+### 관련 서비스 Cross-Reference
+
+- **CRR + KMS Multi-Region Keys** → [Week 9 Day 1]
+- **Object Lock + 컴플라이언스** → SEC, 금융
+- **S3 Inventory + Athena** → 분석 워크플로
+- **Batch Operations + Lambda** → 대량 마이그레이션
+
+---
+
 ## 아키텍처 다이어그램
 
 ```

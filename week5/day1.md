@@ -70,6 +70,93 @@ Amazon S3(Simple Storage Service)는 무한히 확장 가능한 객체 스토리
 
 ---
 
+## 🧠 알아두면 좋은 심화 이론
+
+### S3 강력한 일관성 (Strong Consistency) - 2020년 변경 사항
+
+| 시점 | 동작 |
+|------|------|
+| 2020 이전 | 새 객체는 read-after-write, 기존 객체 update/delete는 **eventual consistency** |
+| **2020 이후** | 모든 GET/PUT/DELETE/LIST가 **Strong Consistency** |
+
+> ⚠️ **함정**: 오래된 시험 자료에 "S3는 eventual consistency"라고 나오면 틀림. 지금은 PUT 후 즉시 GET하면 새 데이터 보장.
+
+### S3 Express One Zone (2023~) - 신규 스토리지 클래스
+
+- **단일 AZ**에 데이터 저장 (지연 시간 ↓)
+- **밀리초 미만** 액세스 — Standard보다 10배 빠름
+- **요청 비용 50% 저렴**, 저장 비용은 비쌈
+- **Directory Bucket** 사용 (일반 General Purpose 버킷과 다름)
+- 사용: AI/ML 학습, HPC, 분석
+
+### 스토리지 클래스 디테일 표 (시험 정확히 외우기)
+
+| 클래스 | AZ | 최소 일수 | 최소 객체 크기 | 검색 비용 | 검색 시간 |
+|--------|-----|----------|----------------|-----------|-----------|
+| Standard | 3+ | - | - | 무료 | 즉시 |
+| **Intelligent-Tiering** | 3+ | - | - | 무료 | 즉시 (티어에 따라 다름) |
+| Standard-IA | 3+ | 30일 | 128KB | 검색 시 GB당 | 즉시 |
+| One Zone-IA | **1** | 30일 | 128KB | 검색 시 GB당 | 즉시 |
+| Glacier Instant Retrieval | 3+ | 90일 | 128KB | 검색 시 GB당 | 즉시 |
+| Glacier Flexible | 3+ | 90일 | 40KB | 검색 시 | Expedited 1-5분 / Standard 3-5h / Bulk 5-12h |
+| Glacier Deep Archive | 3+ | 180일 | 40KB | 검색 시 | Standard 12h / Bulk 48h |
+| Express One Zone | **1** | 1시간 | - | - | <1ms |
+
+> ⚠️ **함정**: One Zone-IA는 11 nines 내구성이지만 **가용성 99.5%** + **AZ 장애 시 데이터 손실 위험**. 재생성 가능한 데이터만 저장.
+
+### Object Lambda (시험 가끔)
+
+- S3 GET 요청 시 Lambda를 거쳐서 객체를 변환·반환
+- 사용: PII 마스킹, 워터마크, CSV→JSON 변환, 압축 해제
+- 원본은 한 번만 저장, 다양한 클라이언트에 다른 형태로 제공
+
+```
+[클라이언트] → [Object Lambda Access Point] → [Lambda] → [S3 GET] → 변환 결과
+```
+
+### S3 Access Point - 대규모 권한 관리
+
+- 버킷당 하나의 정책 대신 **여러 액세스 포인트**로 권한 분리
+- 각 액세스 포인트에 고유 DNS·정책
+- VPC 한정 액세스 포인트 가능 (인터넷 차단)
+- 시험 시나리오: "한 버킷에 여러 팀이 각자 다른 권한으로 접근" → Access Points
+
+### Multi-Region Access Points
+
+- 여러 리전 S3 버킷에 글로벌 엔드포인트 하나로 접근
+- 가장 가까운 리전 자동 라우팅
+- 페일오버 컨트롤 지원
+
+### 명명 추가 디테일 (시험에 가끔)
+
+- 버킷 이름: **3~63자**
+- 점(`.`)이 포함된 이름 → SSL 인증서 와일드카드(`*.s3.amazonaws.com`) 매칭 깨짐 → **HTTPS 사용 시 점 없는 이름 권장**
+- 가상 호스팅 스타일이 현재 권장 (path-style은 deprecated 진행 중)
+
+### 가격 모델 구성 요소
+
+```
+S3 비용 = 저장 비용 + 요청 비용 + 데이터 전송 비용 + 관리 기능 비용
+
+저장: GB/월 (클래스별 다름)
+요청: PUT/GET/COPY/POST/LIST (PUT이 GET보다 비쌈)
+데이터 전송:
+  - IN: 무료
+  - OUT (인터넷): GB당 과금
+  - OUT (같은 리전 AWS 서비스): 무료
+  - OUT (다른 리전): GB당
+관리: Inventory, Analytics, Object Lambda, Replication
+```
+
+### 관련 서비스 Cross-Reference
+
+- **S3 ↔ CloudFront** → [Week 4 / 캐싱] (정적 자산)
+- **S3 ↔ Lambda Trigger** → [Week 3 Day 2]
+- **S3 ↔ Athena/Glue** → 데이터 레이크
+- **S3 ↔ Storage Gateway** → 온프레미스 통합
+
+---
+
 ## 아키텍처 다이어그램
 
 ```

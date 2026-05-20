@@ -82,6 +82,102 @@ SELECT s.name FROM s3object s WHERE s.age > 20
 
 ---
 
+## 🧠 알아두면 좋은 심화 이론
+
+### 멀티파트 업로드 세부 규칙 (시험 빈출)
+
+| 항목 | 값 |
+|------|-----|
+| 최소 파트 크기 | **5 MB** (마지막 파트는 예외) |
+| 최대 파트 크기 | **5 GB** |
+| 최대 파트 수 | **10,000개** |
+| 최대 객체 크기 | **5 TB** |
+| 멀티파트 권장 | 100 MB 이상 |
+| 멀티파트 필수 | 5 GB 이상 (단일 PUT 한도) |
+
+> ⚠️ **함정**: 완료 못 한 멀티파트는 **계속 저장됨 + 비용 발생**. 수명 주기 규칙으로 `AbortIncompleteMultipartUpload` 설정 필수.
+
+### Multipart Upload 권한 (시험 가끔)
+
+- `s3:PutObject` — 일반 업로드
+- `s3:AbortMultipartUpload` — 미완료 정리
+- `s3:ListBucketMultipartUploads` — 진행중 멀티파트 확인
+- `s3:ListMultipartUploadParts` — 파트 확인
+
+### Transfer Acceleration vs CloudFront vs Multi-Region Access Point
+
+| 기능 | Transfer Acceleration | CloudFront | MRAP |
+|------|----------------------|-----------|------|
+| 가속 대상 | S3 업로드·다운로드 | 다운로드 캐싱 | 다중 리전 라우팅 |
+| 작동 | 엣지 → AWS 내부망 → S3 | 엣지에 캐시 | 가장 가까운 리전 |
+| 비용 | 추가 요금 | 캐시 비용 + 데이터 전송 | 리전 간 데이터 전송 |
+| 사용 | 글로벌 사용자 → 단일 버킷 | 정적 콘텐츠 배포 | 글로벌 분산 데이터 |
+
+### S3 처리량 상세
+
+```
+접두사당 한도:
+  PUT/COPY/POST/DELETE: 3,500 RPS
+  GET/HEAD: 5,500 RPS
+  
+접두사 분산 효과:
+  10개 접두사 사용 → 35,000 PUT + 55,000 GET/s 가능
+```
+
+- 접두사는 **객체 키의 앞 부분**, 폴더 개념 아님
+- 자동 파티셔닝: S3가 알아서 핫 파티션 분할 (수 분~수 시간 소요)
+
+### S3 Select & Glacier Select 디테일
+
+- **CSV, JSON, Parquet** 지원 (압축: GZIP, BZIP2)
+- **간단한 SQL만** 지원 (JOIN, 집계 X — Athena 사용)
+- 비용: 스캔한 GB + 반환한 GB
+- 시험: "S3 객체에서 일부 컬럼만 빠르게 조회" → S3 Select
+
+### Athena vs S3 Select - 비교 (시험 가끔)
+
+| 항목 | S3 Select | Athena |
+|------|-----------|--------|
+| 범위 | 단일 객체 | 다중 객체·테이블 |
+| SQL | 제한적 (WHERE만) | 완전 SQL (JOIN, GROUP BY) |
+| 성능 | 빠름 (단일 객체) | Presto 기반 분산 |
+| 비용 | 스캔량 | 스캔량 |
+
+### CloudFront + S3 Origin Access Control (OAC) - 시험 빈출 변경 사항
+
+| 항목 | Origin Access Identity (OAI - 레거시) | **Origin Access Control (OAC - 권장)** |
+|------|--------------------------------------|----------------------------------------|
+| 출시 | 2020 이전 | 2022 |
+| SigV4 지원 | ❌ | ✅ |
+| SSE-KMS 지원 | ❌ | ✅ |
+| 도쿄·서울 등 모든 리전 | 부분 | ✅ |
+| 권장 | ⚠️ 마이그레이션 | ✅ |
+
+> 시험에 "CloudFront로 S3를 비공개 호스팅" → **OAC** 정답 (예전 자료는 OAI라 답함).
+
+### 바이트 범위 가져오기 활용 패턴
+
+```
+1. 병렬 다운로드: 10GB 파일을 1GB씩 10개 스레드로
+2. 헤더만 조회: Range: bytes=0-1023 (메타데이터·파일 타입 판별)
+3. 부분 재다운로드: 중단된 다운로드 이어받기
+```
+
+### S3 Object Lambda (성능 관점)
+
+- 클라이언트 GET 요청 → Object Lambda Access Point → Lambda 변환 → S3 GET → 응답
+- 사용: 다양한 클라이언트에 다른 포맷 (압축/마스킹/형식 변환)
+- 시험에 가끔: "원본은 한 번만 저장하고 다양한 뷰 제공" → Object Lambda
+
+### 관련 서비스 Cross-Reference
+
+- **CloudFront** → 정적 콘텐츠 캐시, OAC로 S3 비공개
+- **Athena** → S3에 SQL 쿼리
+- **Glue/Lake Formation** → 데이터 카탈로그
+- **DataSync** → 대용량 데이터 이동 (온프레미스 ↔ S3)
+
+---
+
 ## 아키텍처 다이어그램
 
 ```

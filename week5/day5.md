@@ -163,6 +163,70 @@ HTTPS 웹사이트 구성
 
 ---
 
+## 🧠 Week 5 시험 함정 & 약어
+
+### 헷갈리는 비교
+
+| A | B | 핵심 |
+|---|---|------|
+| Standard-IA | One Zone-IA | 3AZ vs 1AZ |
+| Glacier Instant | Glacier Flexible | 즉시 vs 분~시간 |
+| Glacier Flexible | Deep Archive | 90일·시간 vs 180일·시간/일 |
+| Intelligent-Tiering | S-IA | 자동 vs 수동 분류 |
+| SSE-S3 | SSE-KMS | 무료·자동 vs 감사·세밀 |
+| SSE-KMS | SSE-C | AWS 키 vs 고객 키 |
+| Bucket Key | KMS Key | 비용 ↓ vs 일반 |
+| CRR | SRR | 다른 리전 vs 같은 리전 |
+| OAI | OAC | 레거시 vs 현재 권장 |
+| Gateway Endpoint | Interface Endpoint | 무료·S3/DDB vs 비용·전체 |
+| ACL | 버킷 정책 | 레거시 vs 권장 |
+| Object Lock Governance | Compliance | IAM 권한이면 가능 vs 절대 불가 |
+| Presigned URL | Bucket Policy 공개 | 임시·개별 vs 영구·전체 |
+| EventBridge mode | S3 Event Notification | 풍부 vs 단순 |
+| S3 Select | Athena | 단일 객체 SQL vs 다중·복잡 |
+| Versioning Suspended | Disabled | 일시 중지 vs 비활성화 (불가) |
+
+### Week 5 시험 함정 15가지
+
+1. **버킷 이름은 글로벌 유일**, 점(`.`) 포함 시 HTTPS 인증서 문제
+2. **2020+ 강력한 일관성** (eventual consistency 아님)
+3. **One Zone-IA는 AZ 장애 시 데이터 손실**
+4. **IA·Glacier 최소 보관 기간** (30/90/180일) — 조기 삭제도 과금
+5. **Glacier Deep Archive 최소 객체 40KB**, IA는 128KB
+6. **버전 관리 비활성화 불가** — Suspended만
+7. **삭제 = 삭제 마커**, 영구 삭제는 버전 ID 명시
+8. **MFA Delete = 루트 계정만**
+9. **복제는 양쪽 버전 관리 필수**, 기존 객체는 Batch Replication
+10. **2023+ 모든 새 객체 자동 SSE-S3 암호화**
+11. **SSE-KMS는 KMS API 한도** → Bucket Key로 99% 절감
+12. **신규 버킷 BPA 4개 모두 ON** + Bucket Owner Enforced (ACL 비활성)
+13. **OAI는 레거시, OAC가 현재 권장**
+14. **단일 PUT 5GB**, 그 이상은 멀티파트 필수
+15. **정적 웹사이트는 HTTP만** → HTTPS는 CloudFront + ACM
+
+### Week 5 약어 정리
+
+| 약어 | 풀네임 |
+|------|--------|
+| **S3** | Simple Storage Service |
+| **IA** | Infrequent Access |
+| **CRR / SRR** | Cross/Same Region Replication |
+| **RTC** | Replication Time Control |
+| **MRAP** | Multi-Region Access Point |
+| **OAC / OAI** | Origin Access Control / Identity |
+| **BPA** | Block Public Access |
+| **SSE** | Server-Side Encryption |
+| **CSE** | Client-Side Encryption |
+| **DSSE** | Dual-layer SSE |
+| **CMK** | Customer Master Key (KMS) |
+| **ACL** | Access Control List |
+| **WORM** | Write Once Read Many (Object Lock) |
+| **TTFB** | Time To First Byte |
+| **MPU** | Multipart Upload |
+| **ETag** | Entity Tag (객체 해시) |
+
+---
+
 ## 📝 Week 5 종합 연습문제
 
 **문제 1.** 비공개 S3 객체를 외부에 임시로 공유하는 방법은?
