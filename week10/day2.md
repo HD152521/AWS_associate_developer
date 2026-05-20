@@ -143,6 +143,112 @@ sudo systemctl start xray
 
 ---
 
+## 🧠 알아두면 좋은 심화 이론
+
+### X-Ray 통합 가능 서비스 (시험 자주 출제)
+
+| 서비스 | 활성화 방법 |
+|--------|------------|
+| **Lambda** | Active Tracing 토글 (콘솔/CLI) |
+| **API Gateway** | 스테이지 X-Ray 활성화 |
+| **EC2 / ECS / EKS** | X-Ray 데몬 실행 (UDP 2000) |
+| **Beanstalk** | 환경 설정에서 X-Ray 활성화 |
+| **AppMesh** | Envoy 사이드카에 X-Ray 활성화 |
+
+> ⚠️ **함정**: ALB는 X-Ray 미지원 (단순 트래픽 패스스루). API Gateway부터 추적 가능.
+
+### Trace ID 전파 (시험에 가끔)
+
+```
+헤더: X-Amzn-Trace-Id: Root=1-5e1b4151-5ac6c58dc39a6d6c2c8e4b21;Parent=53995c3f42cd8ad8;Sampled=1
+```
+
+- 마이크로서비스 호출 시 헤더로 Trace ID 전파
+- 같은 Trace ID로 모든 서비스 통합 추적
+
+### X-Ray 데몬 구성
+
+```bash
+# X-Ray 데몬 (EC2/ECS)
+sudo systemctl start xray
+# 또는 Docker
+docker run -d --name xray -p 2000:2000/udp amazon/aws-xray-daemon
+```
+
+- 컨테이너로도 실행 (ECS 사이드카)
+- 데몬은 SDK로부터 UDP 받아 X-Ray API로 전송 (HTTPS)
+
+### Annotation vs Metadata 디테일
+
+| 항목 | Annotation | Metadata |
+|------|-----------|----------|
+| 인덱싱 | ✅ | ❌ |
+| 검색·필터 | ✅ | ❌ |
+| 크기 한도 | **50개**, 키 500자, 값 1000자 | 무제한 |
+| 사용 | userId, orderId 등 식별자 | 디버깅용 큰 객체 |
+
+### X-Ray 샘플링 규칙
+
+```json
+{
+  "rules": [
+    {
+      "description": "헬스체크 제외",
+      "host": "*",
+      "http_method": "GET",
+      "url_path": "/health",
+      "fixed_target": 0,
+      "rate": 0
+    },
+    {
+      "description": "결제 API 100%",
+      "url_path": "/payment/*",
+      "fixed_target": 1,
+      "rate": 1.0
+    }
+  ],
+  "default": {
+    "fixed_target": 1,
+    "rate": 0.05
+  }
+}
+```
+
+- **fixed_target**: 초당 최소 추적할 트레이스 수
+- **rate**: 그 이후의 비율
+
+### X-Ray Insights (시험 신규)
+
+- 비정상 패턴 자동 감지 (응답 시간 증가, 에러율 증가)
+- 머신 러닝 기반
+- EventBridge로 통합 → 자동 알림
+
+### Service Map 디테일
+
+- 각 노드 색깔: 녹색(정상) → 노란색(경고) → 빨강(에러)
+- 각 엣지에 평균 지연·요청 수·에러율 표시
+- 클라이언트·서버·DB 자동 식별
+
+### CloudWatch ServiceLens (시험 가끔)
+
+- X-Ray + CloudWatch Metrics + Logs를 한 화면에 통합
+- 서비스 맵에서 메트릭·로그 바로 확인
+
+### ADOT (AWS Distro for OpenTelemetry)
+
+- 표준 OpenTelemetry 기반 추적
+- X-Ray와 호환 + Jaeger·Prometheus 등 통합
+- 시험엔 거의 안 나오지만 실무 트렌드
+
+### 관련 서비스 Cross-Reference
+
+- **X-Ray ↔ API Gateway** → [Week 4 Day 3]
+- **X-Ray ↔ Lambda** → [Week 3 Day 1] Active Tracing
+- **ServiceLens ↔ CloudWatch + X-Ray + Logs**
+- **AppConfig + X-Ray** → 점진 배포 모니터링
+
+---
+
 ## 아키텍처 다이어그램
 
 ```

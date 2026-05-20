@@ -139,6 +139,145 @@ cloudwatch.put_metric_alarm(
 
 ---
 
+## 🧠 알아두면 좋은 심화 이론
+
+### CloudWatch 지표 핵심 정리 (시험 빈출)
+
+| 항목 | 기본 | 고해상도 |
+|------|------|----------|
+| 해상도 | **1분** | **1초** |
+| 보존 | 15일~15개월 (자동 단계 축소) | - |
+| 보존 단계 | 1분→3시간, 5분→15일, 1시간→63일, 끝까지 15개월 | - |
+| 비용 | 무료 (EC2 기본 지표) | 추가 |
+
+### EC2 기본 지표에 없는 것 (시험 자주 출제)
+
+❌ **메모리 사용률** (RAM)
+❌ **디스크 사용량** (Used Space)
+❌ **프로세스 정보**
+
+→ **CloudWatch Agent** 설치 필수.
+
+> ⚠️ **함정**: "EC2 OS 수준 지표" → CloudWatch Agent. "디스크 IO 읽기/쓰기 횟수"(`DiskReadOps`)는 기본 지표.
+
+### Detailed Monitoring (시험 가끔)
+
+| 옵션 | 빈도 |
+|------|------|
+| **Basic** (기본) | 5분 |
+| **Detailed Monitoring** | **1분** (추가 비용) |
+
+> ⚠️ **함정**: EC2 기본 모니터링은 **5분 단위**. 1분 단위로 보려면 Detailed Monitoring 활성화 (인스턴스당 추가 비용).
+
+### CloudWatch Logs 디테일
+
+| 단위 | 설명 |
+|------|------|
+| **Log Group** | 보존 기간 설정 단위 |
+| **Log Stream** | 인스턴스/리소스별 로그 흐름 |
+| **Log Event** | 개별 로그 라인 |
+
+| 항목 | 값 |
+|------|-----|
+| 기본 보존 | **무기한 (영구)** |
+| 설정 가능 | 1일~10년 (또는 무기한) |
+| 암호화 | KMS 옵션 |
+| 단일 PutLogEvents 크기 | 1MB |
+
+### Logs Insights 핵심 쿼리 (시험 가끔)
+
+```sql
+fields @timestamp, @message
+| filter @message like /ERROR/
+| stats count(*) by bin(5m)
+| sort @timestamp desc
+| limit 20
+```
+
+- 모든 로그 그룹 동시 쿼리 가능
+- 최대 60분 쿼리 시간
+
+### Logs Subscription Filter
+
+- 실시간 로그 → Lambda·Kinesis·Firehose로 스트리밍
+- 사용: 로그 → Elasticsearch·OpenSearch·S3
+
+```
+CloudWatch Logs → Subscription Filter → Lambda → 변환·전송
+                                      → Kinesis Data Firehose → S3/Splunk
+```
+
+### CloudWatch Alarm 디테일 (시험 빈출)
+
+| 항목 | 값 |
+|------|-----|
+| 평가 기간 | 1~24개 데이터 포인트 |
+| 데이터 포인트 누락 처리 | missing / notBreaching / breaching / ignore |
+| 복합 알람 | 여러 알람을 AND/OR 조합 |
+| 알람 액션 | SNS, AutoScaling, EC2 동작, Systems Manager |
+| Composite Alarm | 알람들의 조합 (Alarm storm 방지) |
+
+### 통계 함수 (시험 가끔)
+
+| 함수 | 의미 |
+|------|------|
+| Average | 평균 |
+| Sum | 합계 |
+| Minimum / Maximum | 최소·최대 |
+| SampleCount | 데이터 포인트 수 |
+| **p99, p95, p50** | 백분위수 (지연 시간 분석에 유용) |
+
+> 💡 시험 시나리오: "API 지연 95%가 1초 이내 보장" → `p95 < 1000ms` 알람.
+
+### EMF (Embedded Metric Format) - Lambda 최적화
+
+```python
+import json
+
+print(json.dumps({
+    "_aws": {
+        "Timestamp": 1721000000000,
+        "CloudWatchMetrics": [{
+            "Namespace": "MyApp",
+            "Dimensions": [["Environment"]],
+            "Metrics": [{"Name": "OrderCount", "Unit": "Count"}]
+        }]
+    },
+    "Environment": "prod",
+    "OrderCount": 5
+}))
+```
+
+- 로그에 JSON 출력 → CloudWatch가 자동으로 지표 추출
+- `PutMetricData` API 호출 없이 지표 생성 (비용 ↓, 빠름)
+- AWS Lambda Powertools가 이를 자동 처리
+
+### CloudWatch Logs Insights vs Athena (시험 가끔)
+
+| 항목 | Logs Insights | Athena |
+|------|---------------|--------|
+| 대상 | CloudWatch Logs | S3 |
+| 쿼리 언어 | 자체 문법 | 표준 SQL |
+| 비용 | 스캔 GB | 스캔 GB |
+| 사용 | 실시간 로그 분석 | 아카이브·대용량 분석 |
+
+### CloudWatch 비용 함정 (실무)
+
+- **Custom Metrics**: 지표당 $0.30/월 → 차원 폭증 시 비용 폭증
+- **Logs**: 수집 $0.50/GB, 저장 $0.03/GB/월
+- **Logs Insights**: 스캔 $0.005/GB
+- **알람**: 표준 $0.10/월, 고해상도 $0.30/월
+
+### 관련 서비스 Cross-Reference
+
+- **CloudWatch Agent** → EC2 메모리·디스크, on-premise도 가능
+- **EMF + Lambda Powertools** → [Week 3]
+- **EventBridge ↔ CloudWatch Events** → 동일 서비스 (리브랜딩)
+- **Container Insights** → [Day 4]
+- **Subscription Filter ↔ OpenSearch** → 로그 분석 파이프라인
+
+---
+
 ## 아키텍처 다이어그램
 
 ```

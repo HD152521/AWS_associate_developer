@@ -133,6 +133,118 @@ EventBridge 규칙 → 대상 (Target)
 
 ---
 
+## 🧠 알아두면 좋은 심화 이론
+
+### CloudTrail 이벤트 유형 3종 정확히
+
+| 유형 | 기본 | 비용 | 예시 |
+|------|------|------|------|
+| **Management Events** | **활성화** (기본) | 90일 무료 | EC2 RunInstances, IAM CreateUser |
+| **Data Events** | **비활성화** | 활성화 시 과금 | S3 GetObject, Lambda Invoke, DynamoDB API |
+| **Insights Events** | 비활성화 | 추가 비용 | 비정상 API 호출 패턴 |
+
+### CloudTrail 보존 (시험 빈출)
+
+```
+콘솔 / API 조회: 90일 (기본 제공)
+S3 Trail:        무제한 (사용자 설정)
+CloudTrail Lake: 7일~10년 (관리형 데이터 레이크)
+```
+
+### Trail 종류
+
+| 종류 | 범위 |
+|------|------|
+| **Single-region trail** | 한 리전만 |
+| **Multi-region trail** | 모든 리전 (권장) |
+| **Organization trail** | AWS Organizations 모든 계정 |
+
+> 💡 시험에 "전체 계정 + 모든 리전 감사" → **Organization Multi-region trail**.
+
+### CloudTrail Lake (2022 신규)
+
+- CloudTrail 이벤트의 관리형 데이터 레이크
+- SQL로 쿼리 (Athena 같은 경험)
+- 7년 보존
+- 시험에 가끔: "장기간 CloudTrail 분석" → CloudTrail Lake
+
+### EventBridge 핵심 구성 요소
+
+| 구성 요소 | 역할 |
+|----------|------|
+| **Event Bus** | 이벤트의 통로 (default, custom, SaaS) |
+| **Rule** | 이벤트 필터링 패턴 |
+| **Target** | 이벤트가 도달할 곳 (20+ AWS 서비스) |
+| **Schema Registry** | 이벤트 스키마 저장·디스커버리 |
+| **Pipes** | 통합 이벤트 파이프라인 (Source→Filter→Enrichment→Target) |
+
+### Event Bus 3종
+
+| 유형 | 사용 |
+|------|------|
+| **Default Bus** | AWS 서비스 이벤트 자동 수신 |
+| **Custom Bus** | 사용자 정의 앱 이벤트 |
+| **Partner Bus (SaaS)** | Datadog, MongoDB, Zendesk 등 |
+
+### EventBridge 패턴 매칭 (시험 출제)
+
+```json
+{
+  "source": ["aws.s3"],
+  "detail-type": ["Object Created"],
+  "detail": {
+    "bucket": { "name": ["my-bucket"] },
+    "object": { "size": [{ "numeric": [">", 1000000] }] }
+  }
+}
+```
+
+지원 매처: prefix, suffix, anything-but, numeric, exists, equals-ignore-case, wildcard.
+
+### EventBridge Pipes (2022 신규)
+
+```
+Source (SQS/Kinesis/DDB/MQ) → Filter → Enrichment(Lambda) → Target
+```
+
+- 점-투-점 통합 (Lambda 없이도 변환·필터링)
+- 시험에 가끔: "여러 서비스를 연결하는 파이프라인" → Pipes
+
+### Schedule (cron / rate)
+
+```
+rate(5 minutes)              # 5분마다
+rate(1 hour)
+cron(0 9 * * ? *)            # 매일 9시
+cron(0/5 * * * ? *)          # 5분마다 (cron 방식)
+```
+
+- **EventBridge Scheduler** (2022 신규): 백만 개 스케줄 관리, 일회성 일정 가능
+
+### CloudTrail → EventBridge 패턴 (실무)
+
+```
+[Console 로그인] → CloudTrail → Event "ConsoleLogin"
+                                 ↓
+                               EventBridge Rule (root 계정 필터)
+                                 ↓
+                               Lambda → SNS → Slack/이메일
+```
+
+### Cross-Account & Cross-Region Event
+
+- EventBridge Rule이 다른 계정/리전의 Event Bus로 이벤트 전송 가능
+- 시험에 가끔: "중앙 계정에서 모든 이벤트 수집" → Organization 이벤트 라우팅
+
+### 관련 서비스 Cross-Reference
+
+- **CloudTrail ↔ Athena** → S3 로그에 SQL 쿼리
+- **EventBridge ↔ Step Functions** → 이벤트 트리거 워크플로
+- **EventBridge ↔ Lambda** → [Week 3 Day 2]
+- **EventBridge Scheduler ↔ Lambda** → cron 대체
+
+---
+
 ## 아키텍처 다이어그램
 
 ```

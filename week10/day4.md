@@ -159,6 +159,83 @@ aws cloudwatch put-anomaly-detector \
 
 ---
 
+## 🧠 알아두면 좋은 심화 이론
+
+### Container Insights vs Prometheus
+
+| 항목 | Container Insights | AMP (Managed Prometheus) |
+|------|-------------------|--------------------------|
+| 지표 수집 | CloudWatch | Prometheus 표준 |
+| 시각화 | CloudWatch | AMG (Managed Grafana) |
+| 비용 | 메트릭당 | 시계열당 |
+| 사용 | ECS/EKS 일반 | EKS·쿠버네티스 표준 도입 |
+
+### Synthetics Canary 사용 사례 (시험 가끔)
+
+| Blueprint | 용도 |
+|-----------|------|
+| **Heartbeat** | 단일 URL 가용성 |
+| **API canary** | REST API 응답 검증 |
+| **Broken link checker** | 페이지의 끊어진 링크 |
+| **Visual monitoring** | 스크린샷 차이 감지 |
+| **Canary Recorder** | 브라우저 동작 녹화 |
+
+### Synthetics 디테일
+
+- Lambda 기반 (Node.js 또는 Python)
+- 최소 1분 간격
+- 다중 리전 동시 실행 가능
+- 실패 시 CloudWatch Alarm 발생
+
+### Anomaly Detection 디테일
+
+- 머신 러닝 모델이 지표 패턴 학습 (밴드 형성)
+- 정상 밴드 벗어나면 알람
+- 시간대·요일별 패턴 자동 학습
+- 사용: 트래픽 패턴이 일정한 지표
+
+### Contributor Insights (시험에 한 번씩)
+
+- 로그 데이터에서 상위 기여자 분석 (예: Top 10 호출 IP)
+- VPC Flow Logs, CloudFront, API Gateway 등에 유용
+
+### Metric Math (시험 가끔)
+
+```
+Expression: m1 / m2 * 100  (성공률)
+m1 = SuccessCount
+m2 = TotalRequests
+```
+
+- 여러 지표 조합으로 새 지표 계산
+- 대시보드·알람에 사용
+
+### Cross-Account Cross-Region Dashboards
+
+- CloudWatch에서 여러 계정·리전 지표를 한 대시보드에
+- AWS Organizations 또는 명시적 계정 공유 필요
+
+### Metric Stream (실무 + 시험 가끔)
+
+- CloudWatch 지표를 거의 실시간으로 외부에 스트리밍
+- 목적지: Kinesis Data Firehose → S3/Datadog/Splunk
+- 시나리오: "외부 모니터링 도구 통합" → Metric Stream
+
+### CloudWatch Application Signals (2024 신규)
+
+- 애플리케이션 수준 SLO 모니터링
+- 마이크로서비스 황금 신호 (지연·트래픽·에러·포화도)
+- OpenTelemetry 기반
+
+### 관련 서비스 Cross-Reference
+
+- **Container Insights ↔ ECS/EKS** → [Week 12]
+- **Synthetics ↔ CloudWatch Alarm + SNS** → 가용성 모니터링
+- **Metric Math ↔ CloudWatch Alarm** → 복합 임계값
+- **Anomaly Detection ↔ ML** → 자동 임계값
+
+---
+
 ## 아키텍처 다이어그램
 
 ```

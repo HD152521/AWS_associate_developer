@@ -63,6 +63,69 @@ Container Insights: ECS/EKS 컨테이너 지표
 
 ---
 
+## 🧠 Week 10 시험 함정 & 약어
+
+### 헷갈리는 비교
+
+| A | B | 핵심 |
+|---|---|------|
+| Basic Monitoring | Detailed Monitoring | 5분 vs 1분 |
+| 기본 해상도 | 고해상도 지표 | 1분 vs 1초·유료 |
+| Management Events | Data Events | 기본·90일 vs 옵션·과금 |
+| CloudTrail Console 조회 | Trail (S3) | 90일 vs 무제한 |
+| CloudWatch Events | EventBridge | 동일 (리브랜딩) |
+| EventBridge Default Bus | Custom Bus | AWS 이벤트 vs 사용자 정의 |
+| EventBridge Rule | EventBridge Pipes | 라우팅 vs 변환·필터링 통합 |
+| Cron | Rate | 특정 시각 vs 주기 |
+| EventBridge Scheduler | Rule (schedule) | 백만 스케줄 vs 단일 규칙 |
+| X-Ray Annotation | Metadata | 인덱싱·필터 vs 미인덱싱 |
+| Active Tracing (Lambda) | X-Ray Daemon (EC2) | 토글만 vs 별도 설치 |
+| ServiceLens | X-Ray | 통합 뷰 vs 추적만 |
+| Container Insights | Prometheus | CloudWatch vs 표준 |
+| Anomaly Detection | Static Threshold | ML 자동 vs 사람 설정 |
+| Synthetics | Health Check (R53) | 스크립트 vs 단순 ping |
+| EMF | PutMetricData | 로그로 자동 추출 vs API |
+| Metric Stream | Logs Subscription | 지표 → 외부 vs 로그 → 외부 |
+
+### Week 10 시험 함정 15가지
+
+1. **EC2 기본 모니터링 = 5분**, Detailed Monitoring = 1분
+2. **EC2 메모리·디스크는 기본 지표 X** → CloudWatch Agent 필요
+3. **CloudWatch Logs 기본 보존 무기한** → 비용 절감하려면 수동 설정
+4. **CloudTrail Management Events 기본 90일** (콘솔 조회)
+5. **CloudTrail Data Events 기본 비활성** + 과금
+6. **CloudTrail Insights 비활성·추가 비용**
+7. **EventBridge Default Bus는 AWS 서비스 이벤트만**
+8. **CloudWatch Events = EventBridge** (리브랜딩)
+9. **X-Ray Annotation 50개 한도**
+10. **X-Ray 샘플링: 처음 1개 + 초당 5%**
+11. **Lambda는 X-Ray Active Tracing 토글**, EC2/ECS는 데몬 필요
+12. **ALB는 X-Ray 미지원**
+13. **CloudWatch Logs 단일 PutLogEvents 1MB**
+14. **EMF로 PutMetricData 없이 지표 생성** (Lambda 비용 절감)
+15. **Synthetics는 Lambda 기반** (Node.js / Python)
+
+### Week 10 약어 정리
+
+| 약어 | 풀네임 |
+|------|--------|
+| **CW** | CloudWatch |
+| **CWL** | CloudWatch Logs |
+| **CWA** | CloudWatch Agent |
+| **CT** | CloudTrail |
+| **EB** | EventBridge (구 CloudWatch Events) |
+| **EMF** | Embedded Metric Format |
+| **ADOT** | AWS Distro for OpenTelemetry |
+| **AMP** | Amazon Managed Service for Prometheus |
+| **AMG** | Amazon Managed Grafana |
+| **SLO / SLI / SLA** | Service Level Objective/Indicator/Agreement |
+| **PII** | Personally Identifiable Information |
+| **JMESPath** | (쿼리 언어 - CLI/X-Ray) |
+| **APM** | Application Performance Monitoring |
+| **RUM** | Real User Monitoring (CloudWatch RUM) |
+
+---
+
 ## 📝 Week 10 종합 연습문제
 
 **문제 1.** Lambda 함수에서 타임아웃이 자주 발생하는 원인을 파악하려면?
