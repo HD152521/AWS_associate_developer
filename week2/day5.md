@@ -59,6 +59,72 @@ CLB: 구형, 레거시, 마이그레이션 권장
 
 ---
 
+## 🧠 Week 2 시험 함정 & 약어
+
+### Week 2 헷갈리기 쉬운 비교
+
+| A | B | 핵심 |
+|---|---|------|
+| 인스턴스 스토어 | EBS | 임시 vs 영구, 호스트 종속 vs 네트워크 |
+| Stop | Terminate | EBS 보존 vs 삭제(기본) |
+| Stop | Hibernate | RAM 소멸 vs RAM 보존(EBS) |
+| Reboot | Stop+Start | 호스트 유지 vs 새 호스트 |
+| 전용 호스트 | 전용 인스턴스 | 물리 서버 통째 vs 격리만 |
+| Standard RI | Convertible RI | 패밀리 고정 vs 교환 가능 |
+| Compute Savings Plan | EC2 Instance Savings Plan | 전 서비스 vs 특정 패밀리 |
+| 퍼블릭 IP | Elastic IP | 휘발성 vs 고정·과금 |
+| 보안 그룹 | NACL | 인스턴스·Stateful vs 서브넷·Stateless |
+| ALB | NLB | 7계층·HTTP vs 4계층·TCP/UDP |
+| Cluster PG | Spread PG | 저지연 모음 vs HW 분산 |
+| Target Tracking | Step Scaling | 단일 목표값 vs 임계값별 |
+| EBS gp3 | io2 | 기본 IOPS 3000 vs 최대 64000 |
+| Cross-Zone (ALB) | Cross-Zone (NLB) | 기본 ON vs 기본 OFF |
+| Sticky (ALB) | Sticky (NLB) | 쿠키 기반 vs Source IP |
+
+### Week 2 시험 함정 12가지
+
+1. **HDD(st1/sc1)는 부팅 볼륨 불가**
+2. **EBS는 AZ 종속** — 다른 AZ로 가려면 스냅샷 경유
+3. **AMI는 리전 종속** — 다른 리전 가려면 복사
+4. **인스턴스 스토어는 Reboot은 유지, Stop/Terminate는 소멸**
+5. **Hibernate는 루트 EBS 암호화 필수 + 인스턴스 타입 제한**
+6. **User Data는 최초 1회만, 16KB 제한, 루트 권한**
+7. **SG는 Stateful, NACL은 Stateless** (NACL은 응답 포트도 명시 필요)
+8. **SG는 Deny 규칙 없음, NACL만 Deny 가능**
+9. **SG는 인스턴스 수준, NACL은 서브넷 수준**
+10. **2분 전 스팟 회수 알림**: IMDS + EventBridge
+11. **NLB만 EIP 지원** (ALB는 DNS만)
+12. **ALB Cross-Zone 기본 ON·무료**, NLB는 기본 OFF·유료
+
+### Week 2 약어 정리
+
+| 약어 | 풀네임 |
+|------|--------|
+| **EC2** | Elastic Compute Cloud |
+| **AMI** | Amazon Machine Image |
+| **EBS** | Elastic Block Store |
+| **EFS** | Elastic File System |
+| **FSx** | (제품군 - Lustre/Windows/ONTAP/OpenZFS) |
+| **EIP** | Elastic IP |
+| **ELB** | Elastic Load Balancing |
+| **ALB / NLB / CLB / GWLB** | Application/Network/Classic/Gateway LB |
+| **ASG** | Auto Scaling Group |
+| **RI** | Reserved Instance |
+| **SP** | Savings Plan |
+| **PG** | Placement Group |
+| **NACL** | Network ACL |
+| **DLM** | Data Lifecycle Manager |
+| **FSR** | Fast Snapshot Restore |
+| **SNI** | Server Name Indication |
+| **TLS** | Transport Layer Security |
+| **ACM** | AWS Certificate Manager |
+| **VPC** | Virtual Private Cloud |
+| **IGW** | Internet Gateway |
+| **NAT** | Network Address Translation |
+| **IOPS** | Input/Output Operations Per Second |
+
+---
+
 ## 아키텍처 다이어그램 - Week 2 전체 통합
 
 ```

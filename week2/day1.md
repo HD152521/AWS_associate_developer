@@ -87,6 +87,76 @@ AMI는 EC2 인스턴스를 시작하는 데 필요한 정보를 포함하는 템
 
 ---
 
+## 🧠 알아두면 좋은 심화 이론
+
+### 추가로 알아둘 인스턴스 패밀리 (시험에 가끔 등장)
+
+| 패밀리 | 특화 | 사용 사례 |
+|--------|------|-----------|
+| **X1, X2, u-** | 초대용량 메모리 (수 TB) | SAP HANA, 인메모리 DB |
+| **F1** | FPGA | 하드웨어 가속, 유전체 분석 |
+| **Inf, Trn** | AWS 자체 ML 칩 (Inferentia, Trainium) | ML 추론·학습 (비용 절감) |
+| **Mac** | Mac mini 베어메탈 | iOS/macOS 빌드 |
+| **HPC** | HPC 워크로드 전용 | 시뮬레이션, 과학 계산 |
+| **A1, T4g, M6g, C7g** | **AWS Graviton (ARM 기반)** | 약 40% 가격대비 성능 ↑ |
+
+> 💡 **Graviton 핵심**: ARM 아키텍처. x86 → ARM 마이그레이션 시 컨테이너/Lambda는 거의 무중단, EC2도 호환 AMI만 있으면 OK. 시험에 "비용 최적화" 키워드 나오면 Graviton 의심.
+
+### 구매 옵션 디테일 (시험 함정 다수)
+
+| 옵션 | 약정 | 유연성 | 특징 |
+|------|------|--------|------|
+| **Standard RI** | 1·3년 | 인스턴스 패밀리 고정 | 최대 72% 할인 |
+| **Convertible RI** | 1·3년 | 다른 패밀리로 교환 가능 | 최대 54% 할인 |
+| **Compute Savings Plan** | 1·3년 | EC2/Lambda/Fargate 전부 | 최대 66% 할인 (가장 유연) |
+| **EC2 Instance Savings Plan** | 1·3년 | 특정 패밀리/리전 | 최대 72% 할인 |
+| **Spot Instance** | 없음 | AWS가 회수 가능 | 최대 90% 할인 |
+| **Spot Block** | 1~6시간 고정 | 약속된 시간 동안 회수 X | (현재 신규 미제공) |
+| **Spot Fleet** | - | 여러 인스턴스 풀에서 자동 조합 | 가용성 ↑ |
+
+> ⚠️ **함정**: "예약 인스턴스(RI)는 양도/교환이 불가" → 틀림. Convertible RI는 교환 가능, Standard RI도 RI Marketplace에서 판매 가능.
+
+### Spot 회수 시그널 - 시험 빈출
+
+- **2분 전 알림**: 인스턴스 메타데이터 `/latest/meta-data/spot/instance-action`
+- EventBridge `EC2 Spot Instance Interruption Warning` 이벤트
+- 알림 후 처리 방식 3가지: `terminate` (기본), `stop`, `hibernate`
+
+### 인스턴스 상태 전환 (시험에 자주 옵션으로 등장)
+
+| 동작 | EBS 데이터 | 인스턴스 스토어 | 퍼블릭 IP | 과금 |
+|------|-----------|----------------|----------|------|
+| **Stop** | 유지 | **소멸** | 회수됨 | EBS만 |
+| **Hibernate** | 유지 (RAM도 저장) | 소멸 | 회수됨 | EBS만 |
+| **Reboot** | 유지 | 유지 | 유지 | 정상 |
+| **Terminate** | 기본 삭제(설정 시 유지) | 소멸 | 회수됨 | 없음 |
+
+> ⚠️ **함정**: Hibernate는 RAM 상태를 EBS에 저장(루트 볼륨 암호화 필수). 콜드 부팅 회피용. 모든 인스턴스 타입이 지원하지는 않음.
+
+### 실무 사례 - 비용 최적화 전략
+
+```
+프로덕션 기본 = Savings Plan + 일부 RI
+일시적 트래픽 스파이크 = 온디맨드
+배치/CI/ML 학습 = Spot
+라이선스 종속 SW (Oracle/Windows BYOL) = Dedicated Host
+```
+
+### Capacity Reservation - 잘 안 알려진 시험 주제
+
+- 특정 AZ/인스턴스 타입의 용량을 미리 확보
+- RI와 달리 **할인은 없음**, 가용성만 보장
+- 사용 안 해도 과금됨 → 재해 복구/이벤트 대비용
+
+### 관련 서비스 Cross-Reference
+
+- **AMI ↔ Image Builder** → 자동화된 골든 AMI 생성
+- **인스턴스 ↔ Systems Manager** → 패치·세션·인벤토리 (SSH 없이 접속)
+- **온디맨드 용량 보장 ↔ Capacity Reservation**
+- **Spot ↔ EC2 Auto Scaling Mixed Instance Policy** → [Day 4]
+
+---
+
 ## 아키텍처 다이어그램
 
 ```

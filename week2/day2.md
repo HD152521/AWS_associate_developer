@@ -95,6 +95,103 @@ echo "<p>Instance ID: $(curl -s http://169.254.169.254/latest/meta-data/instance
 
 ---
 
+## 🧠 알아두면 좋은 심화 이론
+
+### VPC 네트워크 구조 (EC2의 배경 지식 - 시험 빈출)
+
+```
+VPC (10.0.0.0/16)
+├── Public Subnet  (10.0.1.0/24) — Internet Gateway 연결
+│     └── EC2 (퍼블릭 IP) + ALB
+├── Private Subnet (10.0.2.0/24) — NAT Gateway로 외부 통신
+│     └── EC2 (앱 서버), RDS
+└── Database Subnet (10.0.3.0/24) — 외부 차단
+```
+
+| 구성 요소 | 역할 |
+|----------|------|
+| **Internet Gateway** | 퍼블릭 서브넷 ↔ 인터넷 |
+| **NAT Gateway** | 프라이빗 서브넷 → 인터넷 (단방향) |
+| **Route Table** | 서브넷의 트래픽 경로 결정 |
+| **VPC Endpoint** | NAT 없이 AWS 서비스 접근 (S3·DynamoDB Gateway, 나머지 Interface) |
+
+### 퍼블릭 IP vs Elastic IP (시험 함정)
+
+| 항목 | 퍼블릭 IP | Elastic IP (EIP) |
+|------|----------|------------------|
+| 부여 시점 | 인스턴스 시작 시 자동 | 명시적 할당 |
+| 지속성 | 중지 시 변경 | 고정 |
+| 비용 | 무료 | 인스턴스 미연결 시 과금 (2024년부터 연결돼도 시간당 과금) |
+| 한도 | - | 리전당 5개 (Soft limit) |
+
+> ⚠️ **함정**: "EIP를 할당받았는데 인스턴스에 안 붙이면 무료" → 틀림. 미사용 EIP는 과금. 또한 2024년 2월부터 **모든 IPv4 퍼블릭 IP에 시간당 과금**.
+
+### 배치 그룹 (Placement Group) - 3가지 유형
+
+| 유형 | 배치 | 사용 사례 |
+|------|------|-----------|
+| **Cluster** | 동일 AZ, 저지연·고대역 | HPC, 빅데이터 |
+| **Spread** | AZ 내 별도 하드웨어 분산 | 중요 시스템 고가용성 (AZ당 7개 한계) |
+| **Partition** | 여러 파티션으로 분리 | 분산 워크로드 (Hadoop, Cassandra) |
+
+### IMDS hop limit (보안 시나리오 시험 출제)
+
+```bash
+# 컨테이너에서 호스트 IMDS 접근 차단 (hop limit = 1)
+aws ec2 modify-instance-metadata-options \
+  --instance-id i-xxx \
+  --http-put-response-hop-limit 1 \
+  --http-tokens required
+```
+
+- `http-tokens required` → IMDSv2 강제
+- `hop-limit 1` → 컨테이너(Docker NAT)에서 IMDS 우회 차단
+- 보안팀이 SCP로 강제하는 경우 많음
+
+### 보안 그룹 추가 디테일
+
+- 최대 60개 인바운드 규칙 / 60개 아웃바운드 규칙
+- 인스턴스 하나에 최대 5개 SG 부착
+- **변경 즉시 적용** (기존 연결까지 즉시 영향)
+- 한 SG가 자기 자신을 참조 가능 (`sg-xxx ← sg-xxx`) — 클러스터 내부 통신 패턴
+
+### NAT Gateway vs NAT Instance (시험에 자주 출제)
+
+| 항목 | NAT Gateway | NAT Instance |
+|------|-------------|--------------|
+| 관리 | AWS 관리 | 고객 관리 (EC2 인스턴스) |
+| 대역폭 | 최대 45 Gbps (자동) | 인스턴스 타입에 따라 |
+| 가용성 | AZ 내 고가용 | 단일 EC2 (직접 HA 구성 필요) |
+| 권장 | ✅ 현재 표준 | 거의 안 씀 |
+
+### 실무 사례 - 3-Tier 보안 그룹 구성
+
+```
+[ALB-SG]    Inbound: 443/0.0.0.0/0
+              Outbound: → App-SG
+[App-SG]    Inbound: 8080/ALB-SG
+              Outbound: → DB-SG
+[DB-SG]     Inbound: 3306/App-SG
+              Outbound: (Deny all)
+```
+
+> 💡 보안 그룹 체이닝(다른 SG 참조)으로 IP 관리 없이 계층 분리.
+
+### User Data 추가 시나리오
+
+- **재실행 강제**: `mime-multipart` 헤더로 매 부팅 시 실행 가능 → `cloud-config: scripts_per_boot`
+- **CloudFormation cfn-init**: User Data보다 강력한 초기화 (메타데이터 기반)
+- 로그: `/var/log/cloud-init-output.log`에서 실행 결과 확인
+
+### 관련 서비스 Cross-Reference
+
+- **SG ↔ NACL** → VPC 보안 양대축
+- **키 페어 ↔ EC2 Instance Connect / Session Manager** → SSH 키 없이 접속
+- **User Data ↔ AWS Systems Manager State Manager** → 지속적 설정 관리
+- **IAM 역할 ↔ EC2 인스턴스 프로파일** → [Week 1 Day 4]에서 다룸
+
+---
+
 ## 아키텍처 다이어그램
 
 ```

@@ -94,6 +94,130 @@ ASG는 EC2 인스턴스를 자동으로 확장/축소합니다.
 
 ---
 
+## 🧠 알아두면 좋은 심화 이론
+
+### ELB 4종 비교 (시험 매우 빈출)
+
+| 항목 | ALB | NLB | GWLB | CLB(레거시) |
+|------|-----|-----|------|------------|
+| OSI 계층 | 7 | 4 | 3/4 | 4/7 |
+| 프로토콜 | HTTP, HTTPS, gRPC, WebSocket | TCP, UDP, TLS | IP (GENEVE) | HTTP, HTTPS, TCP |
+| 고정 IP | ❌ | ✅ EIP | ❌ | ❌ |
+| 타겟 유형 | EC2, IP, Lambda, ECS | EC2, IP, ALB | EC2 (보안 어플라이언스) | EC2 |
+| 라우팅 | URL/Host/Header | 포트 기반 | 6-tuple 해시 | 기본 |
+| 비용 | 중간 | 낮음 (LCU) | 높음 | 비싸지만 권장X |
+
+> 💡 **GWLB**: 보안 어플라이언스(방화벽, IDS, DPI)를 투명하게 삽입할 때 사용. 시험에 가끔 출제.
+
+### Sticky Session (세션 고정) 상세
+
+| 유형 | ALB 지원 | NLB 지원 | 동작 |
+|------|---------|---------|------|
+| **Duration-based** (`AWSALB`) | ✅ | ❌ | ALB가 쿠키 자동 생성 |
+| **Application-based** (`AWSALBAPP`) | ✅ | ❌ | 앱이 발급한 쿠키 기반 |
+| **Source IP affinity** | ❌ | ✅ | NLB는 IP 기반 sticky만 |
+
+> ⚠️ **함정**: "NLB에 sticky session 설정" → Source IP 기반만 가능. 쿠키 기반은 ALB 전용.
+
+### ALB SSL/TLS 설정 (시험 출제)
+
+- **SNI (Server Name Indication)**: 한 ALB에 여러 SSL 인증서 부착 가능 (호스트별 다른 인증서)
+- **ACM (Certificate Manager)**: 인증서 무료 발급 + 자동 갱신
+- **SSL Policy**: TLS 버전·암호화 스위트 선택
+- **HTTP → HTTPS 리다이렉트**: 리스너 규칙으로 설정
+
+### Connection Draining / Deregistration Delay
+
+- 인스턴스 종료/제거 시 진행 중 요청 완료 대기 시간
+- 기본 300초, 0~3600초 설정 가능
+- ASG의 라이프사이클 훅과 함께 동작
+- 짧으면 502/504 발생 위험, 길면 종료 지연
+
+### ASG Lifecycle Hook (자주 출제)
+
+```
+Pending → [Pending:Wait] → InService
+                ↓ 사용자 작업 (S/W 설치, 워밍업)
+                ↓ CompleteLifecycleAction
+
+InService → [Terminating:Wait] → Terminated
+                ↓ 종료 전 작업 (로그 수집, 그레이스풀 종료)
+```
+
+| 훅 타입 | 트리거 |
+|---------|--------|
+| `autoscaling:EC2_INSTANCE_LAUNCHING` | 시작 시 일시 정지 |
+| `autoscaling:EC2_INSTANCE_TERMINATING` | 종료 시 일시 정지 |
+
+> 💡 **사용**: SNS/SQS/EventBridge로 알림 보내고 Lambda가 처리 후 `complete-lifecycle-action`.
+
+### Termination Policy (인스턴스 종료 순서)
+
+기본 우선순위:
+1. **OldestLaunchConfiguration**: 가장 오래된 시작 구성
+2. **OldestLaunchTemplate**: 가장 오래된 템플릿
+3. **AllocationStrategy**: Spot/온디맨드 비율 맞춤
+4. **ClosestToNextInstanceHour**: 시간당 과금 종료 직전
+5. **NewestInstance**: 가장 최신 (롤백 시나리오)
+6. **OldestInstance**: 가장 오래된 (롤링 갱신)
+7. **Default**: AZ 균형 우선, 그다음 위 정책 조합
+
+### Mixed Instance Policy + Spot/온디맨드 조합
+
+```
+ASG Mixed Policy
+  Base capacity: 2 인스턴스 = 온디맨드 (안정)
+  Above base: 70% Spot, 30% 온디맨드
+  Spot Allocation: capacity-optimized (가장 안정적인 풀)
+```
+
+> 시험 시나리오: "비용 절감 + 안정성" → Mixed Instance Policy.
+
+### 확장 정책 비교 (간단 정리)
+
+| 정책 | 키워드 | 사용 예시 |
+|------|--------|-----------|
+| **Target Tracking** | "CPU 50% 유지" | 일반 권장 |
+| **Step Scaling** | "단계별 추가" | 임계값별 차등 대응 |
+| **Simple Scaling** | "쿨다운 후 1회" | 거의 안 씀 |
+| **Scheduled** | "매일 9시 5대로" | 트래픽 예측 가능 |
+| **Predictive** | "ML 기반 사전 확장" | 패턴이 명확한 워크로드 |
+
+### Cross-Zone Load Balancing (시험 함정)
+
+| 로드 밸런서 | 기본값 | 변경 시 |
+|------------|--------|---------|
+| ALB | **활성화** (무료) | 비활성화 불가 (LB 수준) |
+| NLB | **비활성화** (기본) | 활성화 시 데이터 전송 비용 |
+| CLB | 비활성화 | API/CLI로만 활성화 |
+
+### ALB → Lambda 직접 호출
+
+- Lambda 함수를 ALB 타겟으로 등록 가능
+- 시험 시나리오: "API Gateway 없이 Lambda 노출" → ALB + Lambda 타겟
+- API Gateway보다 비용 ↓, 단 기능은 제한적
+
+### 실무 사례 - 무중단 배포 패턴
+
+```
+[Blue 환경 ASG]    [Green 환경 ASG]
+       ↓                  ↓
+       └──── [ALB Target Group Weighted Routing] ──→ 사용자
+              (Blue 100% → Green 100% 점진 전환)
+```
+
+ALB 가중치 기반 라우팅 + 2개 타겟 그룹으로 Blue/Green 또는 Canary 배포 구현.
+
+### 관련 서비스 Cross-Reference
+
+- **ALB ↔ ECS / Fargate** → [Week 12]
+- **ALB ↔ Lambda 타겟** → [Week 3]
+- **ASG ↔ CloudWatch 경보** → [Week 10]
+- **ASG Lifecycle Hook ↔ SNS/EventBridge** → [Week 11]
+- **ALB Cognito 통합** → [Week 9 Day 3] (인증 위임)
+
+---
+
 ## 아키텍처 다이어그램
 
 ```
