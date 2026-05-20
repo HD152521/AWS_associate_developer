@@ -69,6 +69,68 @@ Week 7 전체 아키텍처 패턴
 
 ---
 
+## 🧠 Week 7 시험 함정 & 약어
+
+### 헷갈리는 비교
+
+| A | B | 핵심 |
+|---|---|------|
+| Multi-AZ | Read Replica | 고가용성·동기 vs 읽기 확장·비동기 |
+| Multi-AZ Instance | Multi-AZ Cluster | Standby 1개 vs Replica 2개 |
+| RDS Read Replica | Aurora Replica | 비동기·수초 vs 공유스토리지·ms |
+| 자동 백업 | 수동 스냅샷 | 35일·DB삭제 시 삭제 vs 무기한·유지 |
+| PITR | Backtrack | 새 DB 생성 vs in-place |
+| CloudWatch | Enhanced Monitoring | 1분·외부 vs 1초·OS 내부 |
+| Enhanced Monitoring | Performance Insights | OS·프로세스 vs 쿼리·대기 |
+| Redis | Memcached | 영속성·자료구조 vs 단순·멀티스레드 |
+| Redis Cluster Mode On | Off | 샤딩 vs 단일 샤드 |
+| Lazy Loading | Write-Through | Miss 시 vs 쓰기 시 |
+| ElastiCache Redis | MemoryDB | 캐시 vs 주 DB 가능 |
+| Aurora Serverless v1 | v2 | 분 단위 vs 초 단위 |
+| Aurora Standard | Aurora Global | 단일 리전 vs 다중 리전 |
+| RDS Proxy | 직접 연결 | 풀링·Failover 빠름 vs 단순 |
+| IAM 인증 | 비밀번호 | 15분 토큰·SigV4 vs 영구 |
+
+### Week 7 시험 함정 15가지
+
+1. **Multi-AZ Standby 읽기 불가** (Multi-AZ Cluster는 가능)
+2. **암호화 변경 = 스냅샷 → 암호화 복사 → 새 DB**
+3. **자동 백업 0일 = PITR·Read Replica 만들기 불가**
+4. **IAM 토큰 15분 + SSL 필수**
+5. **수동 스냅샷은 DB 삭제 후에도 유지** — 비용 발생
+6. **Read Replica 쓰기 직후 조회 = stale 가능**
+7. **Aurora Replica 자동 Failover < 30초**, RDS는 1~2분
+8. **Aurora 6사본 3AZ — Quorum 4쓰기·3읽기**
+9. **Aurora Serverless v1은 콜드 스타트 있음, v2는 거의 없음**
+10. **Redis Cluster Mode Disabled = 단일 샤드** — 메모리 한계
+11. **Memcached = 영속성·백업·Multi-AZ 없음**
+12. **Redis Sorted Set = 리더보드 정답**
+13. **DAX는 DDB 전용, ElastiCache는 범용**
+14. **RDS Proxy = Lambda 동시 연결 문제 해결**
+15. **Aurora Backtrack = MySQL only, 72시간 in-place**
+
+### Week 7 약어 정리
+
+| 약어 | 풀네임 |
+|------|--------|
+| **RDS** | Relational Database Service |
+| **DBI** | DB Instance |
+| **PITR** | Point-In-Time Recovery |
+| **ACU** | Aurora Capacity Unit |
+| **AOF** | Append-Only File (Redis) |
+| **RDB** | Redis Database Backup |
+| **CRR** | Cross-Region Replication (Read Replica) |
+| **OLTP / OLAP** | Online Transaction/Analytical Processing |
+| **DMS** | Database Migration Service |
+| **TDE** | Transparent Data Encryption |
+| **BYOL** | Bring Your Own License |
+| **ACID** | Atomicity, Consistency, Isolation, Durability |
+| **HA / DR** | High Availability / Disaster Recovery |
+| **RTO / RPO** | Recovery Time / Point Objective |
+| **TLS / SSL** | Transport Layer Security |
+
+---
+
 ## 📝 Week 7 종합 연습문제
 
 **문제 1.** RDS Multi-AZ와 Read Replica의 차이점은?

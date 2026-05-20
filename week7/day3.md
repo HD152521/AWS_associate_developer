@@ -104,6 +104,117 @@ def handle_login(user_id):
 
 ---
 
+## 🧠 알아두면 좋은 심화 이론
+
+### 캐싱 전략 5종 (시험 핵심 — 자세히 외우기)
+
+| 전략 | 동작 | 장점 | 단점 |
+|------|------|------|------|
+| **Lazy Loading** (Cache-Aside) | Miss 시 DB → 캐시 | 필요한 것만 캐시 | 첫 호출 느림, 데이터 부패 가능 |
+| **Write-Through** | 쓰기 시 DB+캐시 동시 | 항상 최신 | 안 읽힐 데이터도 캐시 |
+| **Write-Back** (Write-Behind) | 쓰기 → 캐시 후 비동기 DB | 빠른 쓰기 | DB 동기화 지연 위험 |
+| **Refresh-Ahead** | TTL 만료 전 미리 갱신 | 미스 없음 | 불필요 호출 |
+| **TTL** | 만료 시간 설정 | 자동 신선도 | TTL 동안 stale |
+
+### Cache Invalidation (어려운 문제!)
+
+> 컴퓨터 과학의 2대 난제: "Naming Things" + "Cache Invalidation"
+
+**3가지 방법:**
+1. **TTL 기반** — 단순, 일관성 약함
+2. **Event-Driven** — DDB Streams / SNS / EventBridge → 캐시 무효화 Lambda
+3. **Write-Through** — DB와 캐시 동시 갱신
+
+### Redis 자료구조 → 사용 사례 (시험 시나리오)
+
+| 자료구조 | 사용 사례 |
+|----------|-----------|
+| **String** | 단순 키-값, 카운터 (INCR) |
+| **List** | 큐, 최근 N개 |
+| **Set** | 유니크 태그, 중복 제거 |
+| **Sorted Set** | **리더보드, 랭킹** ⭐ |
+| **Hash** | 객체 (user:123 → {name, email}) |
+| **HyperLogLog** | 고유 카운트 추정 (메모리 절약) |
+| **Geo** | 위치 기반 |
+| **Stream** | 메시지 큐·이벤트 |
+| **Bitmap** | 출석체크, 비트 플래그 |
+| **Pub/Sub** | 실시간 메시징 |
+
+### Redis Cluster Mode (시험 함정)
+
+| 모드 | 노드 수 | 샤딩 |
+|------|---------|------|
+| **Cluster Mode Disabled** | 1 primary + 0~5 replicas | 샤딩 X (단일 샤드) |
+| **Cluster Mode Enabled** | 여러 샤드 × (1 primary + 0~5 replicas) | 자동 샤딩 |
+
+> ⚠️ **함정**:
+> - Cluster Mode Disabled: 모든 키가 한 샤드. 메모리 한도 = 인스턴스 크기.
+> - Cluster Mode Enabled: 키가 슬롯 단위 분산. 트랜잭션은 같은 슬롯의 키끼리만.
+
+### Redis Backup / Snapshot
+
+- **자동 백업**: 매일 1회 (RDB 형식, S3 저장)
+- **수동 백업**: 명시적
+- **AOF (Append-Only File)**: 모든 쓰기 로그 — 데이터 손실 거의 0
+- 시험에 "Redis 영속성" → AOF + RDB 조합
+
+### ElastiCache Memcached - 디테일
+
+- 단일 노드 또는 여러 노드 (Auto Discovery)
+- **샤딩**: 클라이언트 측에서 일관된 해싱
+- **멀티스레드** → 더 큰 인스턴스에서 CPU 활용도 높음
+- 영속성 없음 → 노드 재부팅 시 데이터 사라짐
+
+### ElastiCache 보안
+
+- **AUTH 토큰** (Redis 5+): 패스워드 인증
+- **Encryption in transit** (TLS): Redis 3.2.6+, Memcached는 SASL
+- **Encryption at rest**: KMS
+- **VPC**: VPC 내부에서만 접근 (DAX와 동일)
+
+### Memcached vs Redis 결정 트리
+
+```
+영속성·백업 필요? ──── YES ──→ Redis
+                       NO
+                       ↓
+복잡한 자료구조? ──── YES ──→ Redis
+                       NO
+                       ↓
+멀티스레드 활용? ──── YES ──→ Memcached
+                       NO
+                       ↓
+Multi-AZ·HA 필요? ──── YES ──→ Redis
+                       NO ──→ 둘 다 가능 (Memcached가 단순)
+```
+
+### ElastiCache Serverless (2023~)
+
+- Redis/Memcached 모두 Serverless 옵션
+- 자동 확장, ms 단위 응답
+- ECPU(읽기·쓰기) + 저장 GB로 과금
+- 시험엔 가끔: "예측 불가 캐시 트래픽" → Serverless
+
+### MemoryDB vs ElastiCache Redis (시험 가끔)
+
+| 항목 | ElastiCache Redis | MemoryDB |
+|------|-------------------|----------|
+| 영속성 | 옵션 (RDB/AOF) | **Multi-AZ 트랜잭션 로그** |
+| 일관성 | Eventually consistent (replica) | **Strongly consistent** |
+| 사용 | 캐시 | 주 DB 또는 캐시 |
+| 가격 | 저렴 | 비쌈 |
+
+> MemoryDB는 마이크로초 지연 + DB 수준 내구성 → 마이크로서비스 주 DB로도 사용 가능.
+
+### 관련 서비스 Cross-Reference
+
+- **DAX vs ElastiCache** → [Week 6 Day 3]
+- **ElastiCache + Lambda** → 세션 캐시 패턴
+- **MemoryDB ↔ DynamoDB** → 마이크로초 vs 밀리초
+- **Redis Sorted Set ↔ 게임 리더보드** → 실무 표준
+
+---
+
 ## 아키텍처 다이어그램
 
 ```

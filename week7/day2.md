@@ -100,6 +100,96 @@ conn = mysql.connector.connect(
 
 ---
 
+## 🧠 알아두면 좋은 심화 이론
+
+### CloudWatch vs Enhanced Monitoring vs Performance Insights (시험 빈출 3종)
+
+| 도구 | 데이터 출처 | 간격 | 용도 |
+|------|-------------|------|------|
+| **CloudWatch** | 하이퍼바이저 외부 | 60초 (1분) | 인스턴스 수준 |
+| **Enhanced Monitoring** | OS 내부 에이전트 | 1초 ~ 60초 | OS·프로세스 수준 |
+| **Performance Insights** | DB 엔진 내부 | 1초 | 쿼리·대기 이벤트 |
+
+> 💡 시험 시나리오:
+> - "쿼리가 느린 이유" → **Performance Insights**
+> - "OS 메모리·프로세스 보기" → **Enhanced Monitoring**
+> - "기본 알람·메트릭" → **CloudWatch**
+
+### RDS 백업 디테일 (시험 함정)
+
+| 항목 | 자동 백업 | 수동 스냅샷 |
+|------|-----------|-------------|
+| 보존 | 0~35일 (0=비활성) | 무제한 (단 비용↑) |
+| DB 삭제 후 | 자동 삭제 | 유지 |
+| 비용 | RDS 스토리지 100%까지 무료 | 별도 과금 |
+| 복원 | PITR (Point-in-Time) | 특정 스냅샷 시점 |
+| 다른 계정 공유 | ❌ | ✅ (KMS 키 공유 필요) |
+| 다른 리전 복사 | ❌ | ✅ |
+
+> ⚠️ **함정**: "0일로 설정"하면 자동 백업 OFF — 일부 기능(PITR, Read Replica 생성) 사용 불가. 시험에 "Read Replica 만들었는데 안 됨" → 자동 백업 활성화 확인.
+
+### RDS Storage 종류 (시험 출제)
+
+| 유형 | 사용 |
+|------|------|
+| **gp3** (범용 SSD) | 기본 권장, 독립 IOPS 설정 |
+| **gp2** (범용 SSD) | 이전 세대 |
+| **io1** (프로비저닝 IOPS SSD) | 고성능 OLTP |
+| **io2 Block Express** | 최고 성능, Oracle/SQL Server 일부 |
+| **magnetic** | 레거시, 비권장 |
+
+### RDS Storage Auto Scaling
+
+- 사용량 90% 도달 시 자동 확장
+- 최대 한도 설정 필요
+- 시험: "스토리지 부족으로 DB 다운" → Storage Auto Scaling 활성화
+
+### IAM DB Authentication 디테일
+
+- MySQL, PostgreSQL, Aurora만 지원
+- 비밀번호 대신 IAM 자격증명 → SigV4 토큰 → 15분 유효
+- 동시 연결 200/초로 제한 (MySQL)
+- 시나리오: Lambda → RDS 비밀번호 관리 회피
+- **Aurora DSQL** (2024 신규)도 IAM 인증 표준
+
+### 매개변수·옵션 그룹 (시험 가끔)
+
+| 그룹 | 역할 |
+|------|------|
+| **DB Parameter Group** | 엔진 파라미터 (memory, query cache 등) |
+| **DB Option Group** | 엔진 추가 기능 (Oracle TDE, SQL Server Audit) |
+| **DB Cluster Parameter Group** | Aurora 클러스터 수준 |
+
+기본 그룹은 수정 불가 → 커스텀 그룹 생성 후 적용.
+
+### 유지보수 윈도우
+
+- 주 1회 30분 윈도우 (지정 가능)
+- 마이너 버전 자동 업그레이드 옵션
+- 패치는 종료 시 페일오버(다운타임) 발생할 수 있음
+- Multi-AZ면 다운타임 최소화 (standby부터 패치)
+
+### Secrets Manager + RDS 통합 (시험 출제)
+
+- 비밀번호 자동 회전 (lambda 사용 안 함, AWS 관리)
+- 회전 주기 설정 (기본 30일)
+- 시나리오: "DB 비밀번호 정기 교체 + 무중단" → Secrets Manager 회전
+
+### CloudWatch Logs 통합
+
+- RDS 로그를 CloudWatch Logs로 전송 (Error/Audit/Slow Query/General)
+- 자동 활성화 X — 명시적 설정 필요
+- KMS 암호화 가능
+
+### 관련 서비스 Cross-Reference
+
+- **Secrets Manager 회전** → [Week 9 Day 2]
+- **CloudWatch Logs Insights** → [Week 10 Day 1]
+- **AWS Backup** → 통합 백업 관리
+- **KMS** → [Week 9 Day 1] RDS 암호화 키
+
+---
+
 ## 아키텍처 다이어그램
 
 ```

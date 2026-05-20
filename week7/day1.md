@@ -81,6 +81,85 @@ write_db.execute("INSERT INTO orders ...")
 
 ---
 
+## 🧠 알아두면 좋은 심화 이론
+
+### RDS 지원 엔진 디테일
+
+| 엔진 | 특징 | 라이선스 |
+|------|------|----------|
+| **MySQL** | 가장 일반적 | 오픈소스 |
+| **PostgreSQL** | 고급 기능, JSON 지원 | 오픈소스 |
+| **MariaDB** | MySQL fork | 오픈소스 |
+| **Oracle** | 엔터프라이즈 표준 | BYOL or License Included |
+| **SQL Server** | MS 생태계 | License Included only |
+| **Aurora MySQL/PostgreSQL** | AWS 독자 | AWS 가격 |
+
+> ⚠️ **함정**: SQL Server는 BYOL 옵션 없음. Oracle은 BYOL 가능. 시험에 "라이선스 비용 절감" 시나리오 → Oracle BYOL 또는 PostgreSQL/Aurora 마이그레이션.
+
+### Multi-AZ 종류 (시험 가끔)
+
+- **Multi-AZ DB Instance Deployment** (기존): Standby 1개, 읽기 불가
+- **Multi-AZ DB Cluster Deployment** (2022~): 2개 읽기 가능 standby + 1 writer (MySQL/PostgreSQL only)
+
+### Read Replica 지연 시간 - 시험 시나리오
+
+```
+쓰기 → Primary → 비동기 복제 → Read Replica
+                            (수 밀리초~수 분 지연)
+```
+
+> ⚠️ **함정**: 쓰기 직후 Read Replica에서 같은 데이터 조회 → 못 찾을 수 있음 (Read-Your-Writes 문제). 동일 사용자 데이터는 Primary에서 읽기 권장.
+
+### Read Replica Cross-Region
+
+- 재해 복구용, 다른 리전에 ASYNC 복제
+- 승격(promote) 시 독립 DB가 됨 (역방향 복제 X)
+- 데이터 전송 비용 발생 (리전 간)
+
+### Read Replica + Aurora 차이 (시험 자주 출제)
+
+| 항목 | RDS Read Replica | Aurora Replica |
+|------|------------------|----------------|
+| 복제 방식 | 비동기 (DB 엔진 레벨) | **공유 스토리지** (밀리초) |
+| 복제 지연 | 수 초~수 분 | 10~20ms |
+| Failover | 수동 승격 (분) | 자동 (30초 이내) |
+| 최대 수 | 5개 (MySQL/PG), 15개 (Aurora) | **15개** |
+| 비용 | 인스턴스 비용 | 인스턴스 비용 |
+
+### RDS Proxy (시험 가끔)
+
+- 연결 풀링 → DB 부하 감소, Lambda 등 서버리스에 적합
+- IAM 인증 통합
+- Failover 시간 단축 (66%)
+- Secrets Manager 통합
+
+> 시험 시나리오: "Lambda가 RDS에 동시 연결 너무 많이 만들어요" → **RDS Proxy** 사용.
+
+### Aurora vs RDS 결정 트리
+
+```
+관계형 DB 필요
+  ↓
+오픈소스(MySQL/PostgreSQL)?
+  ├─ YES → Aurora 권장 (성능·기능)
+  └─ NO  → RDS (Oracle/SQL Server)
+  
+간헐적 트래픽?
+  └─ YES → Aurora Serverless v2
+  
+다중 리전 활성/활성?
+  └─ Aurora Global Database
+```
+
+### 관련 서비스 Cross-Reference
+
+- **RDS Proxy ↔ Lambda + IAM Auth** → [Day 2, Week 3]
+- **Multi-AZ ↔ Standby** → 동기 복제 (RPO≈0)
+- **Aurora 6 copy storage** → [Day 4]
+- **Database Migration Service (DMS)** → 온프레미스 → RDS 마이그레이션
+
+---
+
 ## 아키텍처 다이어그램
 
 ```

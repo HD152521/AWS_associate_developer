@@ -117,6 +117,105 @@ Aurora 글로벌 데이터베이스
 
 ---
 
+## 🧠 알아두면 좋은 심화 이론
+
+### Aurora 스토리지 - Quorum 기반 일관성 (시험 빈출)
+
+```
+6개 사본 = 3 AZ × 2 사본
+쓰기 정족수: 4/6 (V_w = 4)
+읽기 정족수: 3/6 (V_r = 3)
+V_w + V_r > V (4+3 > 6) → 강력한 일관성 보장
+
+장애 허용:
+  AZ 1개 + 노드 1개 손실 = 읽기 가능
+  AZ 1개 손실 = 쓰기 가능
+```
+
+### Aurora Replica 특징 (시험 매우 자주)
+
+- **공유 스토리지** → Replica는 자체 사본 없음, Primary와 동일한 스토리지 읽기
+- 복제 지연: **10~20ms** (RDS Read Replica의 수 초보다 훨씬 빠름)
+- 최대 15개 Replica
+- Failover 시 30초 이내 (Replica가 Primary 승격)
+
+### Aurora Serverless v1 vs v2 (시험 신규)
+
+| 항목 | v1 (레거시) | v2 (권장) |
+|------|------------|-----------|
+| 확장 단위 | ACU (Aurora Capacity Unit) | ACU |
+| 확장 속도 | 분 단위 | **초 단위** |
+| Min Capacity | 1 ACU | **0.5 ACU** (또는 0) |
+| Max Capacity | 256 | 128 |
+| 콜드 스타트 | 있음 | **거의 없음** |
+| 멀티 AZ | 옵션 | 기본 |
+
+> 💡 v2가 거의 모든 면에서 우월. 신규는 v2 권장. v1은 사실상 단종 절차.
+
+### Aurora Global Database 디테일
+
+- **Primary 리전 1개 + Secondary 리전 최대 5개**
+- 복제 지연: 일반적으로 **1초 미만**
+- 전용 복제 인프라 (스토리지 수준)
+- Secondary는 읽기 전용
+- **Cross-Region Failover**: RTO < 1분, RPO < 1초
+
+### Aurora Backtrack (MySQL만)
+
+- DB를 과거 시점으로 되돌리기 (스냅샷 복원 X)
+- 최대 72시간 전까지
+- 빠름 (수 분 → 수 초)
+- 시나리오: "잘못 DROP TABLE 했어요" → Backtrack 가능
+
+### Aurora Database Cloning
+
+- 매우 빠른 클론 생성 (스토리지 공유 + COW)
+- 사용: 개발·테스트 환경 빠르게 생성
+
+### Aurora 엔드포인트 5종
+
+| 엔드포인트 | 역할 |
+|-----------|------|
+| **Cluster Endpoint** (Writer) | Primary로만 |
+| **Reader Endpoint** | 모든 Replica로 로드 분산 |
+| **Custom Endpoint** | 지정한 Replica 그룹 (분석 워크로드 격리) |
+| **Instance Endpoint** | 특정 인스턴스 직접 |
+| **Aurora Global DB Writer** | 글로벌 DB Primary 리전 자동 라우팅 |
+
+### Aurora Auto Scaling (Replica)
+
+- CPU 또는 connection 기반
+- 최대 15개까지 자동 추가
+- ASG와 유사
+
+### Aurora 비용 vs 성능
+
+| 항목 | RDS MySQL | Aurora MySQL |
+|------|-----------|--------------|
+| 가격 | 표준 | **20% 더 비쌈** |
+| 성능 | 1x | **최대 5x** |
+| Replica | 5개 | **15개** |
+| 스토리지 | 명시적 할당 | **자동 확장** |
+| Failover | 1~2분 | **< 30초** |
+
+### Backtrack vs PITR (시험 함정)
+
+| 항목 | Backtrack | PITR |
+|------|-----------|------|
+| 새 DB 생성? | ❌ (in-place) | ✅ |
+| 속도 | 매우 빠름 | 수 분 |
+| 지원 | Aurora MySQL only | RDS + Aurora |
+| 최대 기간 | 72시간 | 35일 |
+
+### 관련 서비스 Cross-Reference
+
+- **Aurora Global Database ↔ DynamoDB Global Tables** → 멀티 리전 비교
+- **Aurora Serverless v2 ↔ Lambda** → 둘 다 자동 확장
+- **Aurora Cluster Cloning ↔ S3 Same Account Replication** → 빠른 복제 패턴
+- **Aurora MySQL ↔ DMS** → 마이그레이션
+
+---
+
 ## 아키텍처 다이어그램
 
 ```
