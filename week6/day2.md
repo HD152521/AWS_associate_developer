@@ -44,6 +44,89 @@
 
 ---
 
+## 🧠 알아두면 좋은 심화 이론
+
+### Single-Table Design (실무 표준 + 시험 시나리오)
+
+DynamoDB 모범 사례: **여러 엔티티를 한 테이블에 저장** + 인덱스로 다양한 조회 패턴 지원.
+
+```
+USER#123    PROFILE       { name, email }
+USER#123    ORDER#001     { total, status }
+USER#123    ORDER#002     { total, status }
+PRODUCT#A   DETAIL        { name, price }
+PRODUCT#A   REVIEW#u1     { rating, text }
+```
+
+- 파티션 키: `PK` (USER#id, PRODUCT#id)
+- 정렬 키: `SK` (PROFILE, ORDER#xxx)
+- GSI로 역방향 조회 (예: GSI1PK=`PRODUCT#A`, GSI1SK=`REVIEW#xxx`)
+
+### GSI Projection 옵션 (시험에 가끔)
+
+| 옵션 | 인덱스에 저장 | 비용 |
+|------|---------------|------|
+| **KEYS_ONLY** | PK + SK만 | 최저 |
+| **INCLUDE** | 지정한 속성만 | 중간 |
+| **ALL** | 모든 속성 | 최고 |
+
+> 💡 KEYS_ONLY로 검색하고 필요 시 GetItem으로 원본 가져오는 패턴이 가장 저렴.
+
+### GSI Throttling - 함정 시나리오
+
+```
+기본 테이블 WCU 충분 → 쓰기 OK
+GSI WCU 부족 → GSI 쓰기 실패 → 기본 테이블 쓰기도 throttled!
+```
+
+> ⚠️ **함정**: GSI도 자체 WCU 부족하면 본 테이블에 영향. 항상 GSI WCU ≥ 기본 WCU 유지 또는 온디맨드 모드.
+
+### Query vs Scan 디테일
+
+| 항목 | Query | Scan |
+|------|-------|------|
+| 조건 | 파티션 키 = (필수) + 정렬 키 비교 | 없음 (전체 읽기) |
+| 효율성 | ✅ 빠름 | ❌ 느림 |
+| 정렬 순서 | `ScanIndexForward` (ASC/DESC) | 정렬 X |
+| 페이지네이션 | `LastEvaluatedKey` → `ExclusiveStartKey` | 동일 |
+| Parallel Scan | ❌ | `Segment`/`TotalSegments`로 병렬 |
+| 비용 | 일치하는 데이터만 | **전체 스캔** |
+
+### Sparse Index (희소 인덱스) - 고급 패턴
+
+GSI 파티션 키가 일부 항목에만 존재하면 해당 항목만 인덱스에 포함 → 효율적.
+
+```
+USER#123 가 admin=true → 인덱스에 포함
+USER#456 admin 속성 없음 → 인덱스에 포함 X
+
+GSI로 "관리자만 조회" 효율적
+```
+
+### LSI 추가 디테일
+
+- LSI 사용 시 **단일 파티션 키 항목 컬렉션 = 10GB 제한** (전체 LSI 합산)
+- LSI는 본 테이블 RCU/WCU 공유 → 추가 비용 없음
+- LSI 강력 일관성 가능 (GSI는 불가)
+
+### 키 설계 - 시험에 자주 출제되는 패턴
+
+| 시나리오 | 키 설계 |
+|----------|---------|
+| 사용자별 주문 (최신순) | PK=UserId, SK=OrderDate (ScanIndexForward=false) |
+| 카테고리별 상품 + 가격순 | GSI: PK=Category, SK=Price |
+| 시간 범위 쿼리 | PK=동일, SK=ISO 타임스탬프 |
+| 위계 데이터 | PK=ParentId, SK=`<type>#<id>` |
+| Geospatial | Geohash를 파티션 키로 |
+
+### 관련 서비스 Cross-Reference
+
+- **GSI 비동기 복제** → 쓰기 후 즉시 GSI 조회 시 비반영 가능
+- **Single-Table Design ↔ DynamoDB Streams** → [Day 3]
+- **NoSQL Workbench** → 키 설계 시각화 도구
+
+---
+
 ## 아키텍처 다이어그램
 
 ```

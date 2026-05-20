@@ -76,6 +76,96 @@ DynamoDB는 완전 관리형 NoSQL 데이터베이스 서비스입니다.
 
 ---
 
+## 🧠 알아두면 좋은 심화 이론
+
+### DynamoDB 핵심 한도 (시험 자주 출제)
+
+| 항목 | 한도 |
+|------|------|
+| 항목(Item) 최대 크기 | **400 KB** |
+| 테이블당 GSI | **20개** (요청으로 ↑ 가능) |
+| 테이블당 LSI | **5개** |
+| 테이블당 속성 이름 길이 | 64 KB |
+| 파티션 키 길이 | 1~2,048 바이트 |
+| 정렬 키 길이 | 1~1,024 바이트 |
+| 파티션당 처리량 | **3,000 RCU + 1,000 WCU** |
+| 단일 트랜잭션 | 100개 항목 / 4MB (이전엔 25개) |
+| BatchGetItem | 100개 항목 / 16MB |
+| BatchWriteItem | 25개 PutItem/DeleteItem / 16MB |
+
+> ⚠️ **함정**: 항목 400KB. 큰 데이터(이미지 등)는 S3에 저장하고 DynamoDB에는 **S3 URL**만 보관 — 표준 패턴.
+
+### 일관성 모델 - SQL DB와 다른 점
+
+| 동작 | DynamoDB | RDBMS |
+|------|----------|-------|
+| 기본 쓰기 | 동기적 모든 AZ 복제 | 동기 단일 → 비동기 복제 |
+| 기본 읽기 | **Eventually Consistent** (0.5 RCU) | 일반적으로 Strong |
+| 강력 일관성 | `ConsistentRead=true` (1 RCU) | 기본 |
+| 트랜잭션 | TransactWrite/Get (2x 비용) | 기본 ACID |
+| GSI 읽기 | **Eventually Consistent만** | - |
+
+### DynamoDB 표현식 (시험 빈출)
+
+```
+KeyConditionExpression  - Query에서 키 조건
+FilterExpression        - 결과 필터 (RCU는 그대로!)
+UpdateExpression        - SET, REMOVE, ADD, DELETE
+ConditionExpression     - 쓰기 조건 (조건부 쓰기)
+ProjectionExpression    - 반환할 속성 선택
+```
+
+> ⚠️ **함정**: `FilterExpression`은 **읽은 후** 필터링 → RCU 절감 X. 비용 줄이려면 KeyCondition·인덱스 활용.
+
+### 예약어와 ExpressionAttributeNames
+
+`name`, `type`, `count` 등 DynamoDB 예약어를 속성으로 쓸 때:
+
+```python
+update_item(
+    UpdateExpression='SET #n = :v',
+    ExpressionAttributeNames={'#n': 'name'},
+    ExpressionAttributeValues={':v': {'S': 'Kim'}}
+)
+```
+
+### 데이터 분산 - 파티션 메커니즘
+
+```
+파티션 키 → SHA-1 해시 → 파티션 결정
+같은 파티션 키 → 같은 파티션 (정렬 키로 정렬)
+
+파티션당 한도:
+  스토리지: 10GB
+  처리량: 3,000 RCU + 1,000 WCU
+초과 시 자동 분할 (Adaptive Capacity)
+```
+
+> 💡 **Adaptive Capacity** (2018~): 핫 파티션 자동 감지 + 다른 파티션의 여유 용량 재할당. 시험에 가끔 "핫 파티션 발생 시" → AC가 도움 주지만 키 설계가 근본.
+
+### 데이터 분산 전략 - 핫 파티션 방지
+
+| 안티 패턴 | 개선 |
+|-----------|------|
+| `date` 파티션 키 (오늘 모든 쓰기 → 한 파티션) | `date#hash` 또는 UUID |
+| `status` 파티션 키 (값이 적음) | 복합 키 + GSI |
+| sequential ID | 시드 분산 (`hash(id) + id`) |
+
+### DynamoDB Local & Test 환경
+
+- **DynamoDB Local**: 로컬 jar로 다운로드 가능, 무료, 통합 테스트용
+- **PartiQL**: SQL 호환 쿼리 (Select/Insert/Update/Delete) — 시험엔 가끔
+- **NoSQL Workbench**: GUI 도구 (테이블 설계·시각화)
+
+### 관련 서비스 Cross-Reference
+
+- **DAX (DynamoDB Accelerator)** → [Day 3 / 마이크로초 캐시]
+- **Streams + Lambda** → [Day 3]
+- **Global Tables (다중 리전)** → 멀티 리전 활성/활성
+- **KMS** → 저장 시 자동 암호화 (선택: AWS owned / aws managed / customer managed)
+
+---
+
 ## 아키텍처 다이어그램
 
 ```

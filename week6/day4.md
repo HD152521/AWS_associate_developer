@@ -121,6 +121,98 @@ dynamodb.update_item(
 
 ---
 
+## 🧠 알아두면 좋은 심화 이론
+
+### 트랜잭션 API 상세 (시험 매우 빈출)
+
+| API | 용도 | 최대 |
+|-----|------|------|
+| `TransactWriteItems` | Put/Update/Delete/ConditionCheck | **100개 항목 / 4MB** |
+| `TransactGetItems` | 다중 GetItem 원자적 | 100개 항목 / 4MB |
+| `BatchWriteItem` | Put/Delete만 (원자적 X) | 25개 / 16MB |
+| `BatchGetItem` | 다중 GetItem (원자적 X) | 100개 / 16MB |
+
+> ⚠️ **함정**: BatchWriteItem은 **원자적 아님** — 일부 성공·일부 실패 가능 (UnprocessedItems 반환). 진짜 원자성은 TransactWriteItems.
+
+### ConditionCheck (TransactWrite 액션 4종)
+
+```python
+TransactItems=[
+    { 'Put': {...} },
+    { 'Update': {...} },
+    { 'Delete': {...} },
+    { 'ConditionCheck': {  # 다른 테이블의 조건만 확인 (쓰기 X)
+        'TableName': 'Inventory',
+        'Key': {...},
+        'ConditionExpression': 'quantity > :zero'
+    }}
+]
+```
+
+### Atomic Counter vs Conditional Increment
+
+```python
+# Atomic Counter — 조건 없이 항상 증가 (재시도 시 중복 가능)
+UpdateExpression='ADD counter :inc',
+ExpressionAttributeValues={':inc': {'N': '1'}}
+
+# Conditional Increment — 한도 검사
+UpdateExpression='SET counter = counter + :inc',
+ConditionExpression='counter < :limit',
+ExpressionAttributeValues={':inc': {'N': '1'}, ':limit': {'N': '100'}}
+```
+
+> 💡 **차이**: Atomic Counter는 멱등성 X. 같은 요청 중복 시 카운터 여러 번 증가. 멱등성 필요하면 ConditionCheck + idempotency key 사용.
+
+### Optimistic vs Pessimistic Locking
+
+| 항목 | Optimistic (DDB) | Pessimistic (RDBMS) |
+|------|-----------------|---------------------|
+| 방식 | 버전 비교 (`ConditionExpression`) | 행 잠금 (SELECT FOR UPDATE) |
+| 성능 | 빠름 (잠금 없음) | 느림 (대기) |
+| 충돌 시 | 에러 → 재시도 | 자동 대기 |
+| DynamoDB | ✅ 지원 (조건부 쓰기) | ❌ 미지원 |
+
+### TTL 시험 함정
+
+- TTL은 **속성 값(epoch 초)** 으로 동작 — 자동 변환 X (사람 읽는 형식 금지)
+- 만료 후 **0~48시간** 내 삭제 (보장 X)
+- 만료된 항목도 만료 후 일정 시간은 **Query/Scan/GetItem에 나타남** → 앱에서 필터링 필요
+- **삭제는 무료** (WCU 소비 X)
+- Streams에는 `userIdentity: {type: "Service", principalId: "dynamodb.amazonaws.com"}`로 표시
+
+### Idempotency Key (Lambda + DDB)
+
+```python
+# ClientRequestToken으로 동일 트랜잭션 재시도 방지 (10분 idempotent)
+client.transact_write_items(
+    TransactItems=[...],
+    ClientRequestToken='unique-tx-id-12345'
+)
+```
+
+### Optimistic Locking 라이브러리
+
+- **AWS SDK for Java**: `@DynamoDBVersionAttribute` 어노테이션 자동 처리
+- **Python boto3**: 직접 ConditionExpression 작성
+
+### 동시성 패턴 (시험 시나리오)
+
+| 시나리오 | 해결책 |
+|----------|--------|
+| 재고가 음수가 되면 안 됨 | Conditional Update + `quantity >= :qty` |
+| 멱등 결제 | ClientRequestToken 또는 idempotency table |
+| 좌석 예약 | Optimistic Locking with version |
+| 동시 분배 (선착순) | Conditional Update + `attribute_not_exists(claimedBy)` |
+
+### 관련 서비스 Cross-Reference
+
+- **Lambda Idempotency** → [Week 3 Day 2]
+- **Step Functions** → 분산 트랜잭션 보상 패턴 (Saga)
+- **EventBridge** → 결제 이벤트 멱등 처리
+
+---
+
 ## 아키텍처 다이어그램
 
 ```

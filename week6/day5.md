@@ -75,6 +75,65 @@ DynamoDB 완전한 아키텍처 패턴
 
 ---
 
+## 🧠 Week 6 시험 함정 & 약어
+
+### DynamoDB 헷갈리는 비교
+
+| A | B | 핵심 |
+|---|---|------|
+| Strong Consistent | Eventually Consistent | 1 RCU vs 0.5 RCU |
+| LSI | GSI | 같은 PK·생성 시만 vs 다른 PK·언제든 |
+| Query | Scan | PK 조건 vs 전체 |
+| FilterExpression | KeyConditionExpression | 읽은 후 필터 vs 인덱스 검색 |
+| Provisioned | On-Demand | 미리 설정 vs 자동·2-3x 비쌈 |
+| BatchWriteItem | TransactWriteItem | 25개·원자성 X vs 100개·ACID |
+| Atomic Counter | Conditional Update | 멱등성 X vs 조건 검사 |
+| TTL | DeleteItem | 비동기 무료 vs 즉시 WCU |
+| Streams | Kinesis for DDB | 24h vs 1년 |
+| DAX | ElastiCache | DDB 전용·SDK 호환 vs 범용 |
+| LSI Strong Consistency | GSI Strong Consistency | ✅ vs ❌ |
+| Global Tables | Standard | 다중 리전 vs 단일 리전 |
+| KEYS_ONLY | ALL | 키만·저렴 vs 전체·비쌈 |
+| Burst Capacity | Adaptive Capacity | 5분 누적 vs 핫 파티션 재분배 |
+
+### Week 6 시험 함정 15가지
+
+1. **항목 최대 400KB** — 큰 데이터는 S3
+2. **파티션당 한도 3000 RCU + 1000 WCU + 10GB**
+3. **GSI는 Eventually Consistent만**
+4. **GSI WCU 부족 → 본 테이블 쓰기도 영향**
+5. **LSI는 테이블 생성 시에만**, 변경·삭제 불가
+6. **트랜잭션은 2x WCU/RCU 비용**
+7. **TransactWriteItems 최대 100개·4MB** (이전 25개)
+8. **FilterExpression은 RCU 절감 X**
+9. **TTL은 epoch 초**, 0~48시간 내 삭제
+10. **DAX는 VPC 내부만**
+11. **Streams 24h 고정**, 더 필요하면 Kinesis로
+12. **모드 전환 24시간에 1회**
+13. **온디맨드 초기 예열 부족** → 2x 트래픽 급증 시 throttle
+14. **Strong Consistency는 LSI만 (GSI X)**
+15. **Atomic Counter는 멱등성 없음** — 재시도 중복
+
+### Week 6 약어 정리
+
+| 약어 | 풀네임 |
+|------|--------|
+| **PK** | Partition Key |
+| **SK** | Sort Key |
+| **RCU / WCU** | Read/Write Capacity Unit |
+| **LSI** | Local Secondary Index |
+| **GSI** | Global Secondary Index |
+| **DAX** | DynamoDB Accelerator |
+| **TTL** | Time To Live |
+| **PITR** | Point-In-Time Recovery |
+| **ACID** | Atomicity, Consistency, Isolation, Durability |
+| **CRUD** | Create/Read/Update/Delete |
+| **DDB** | DynamoDB (줄임말) |
+| **NoSQL** | Not Only SQL |
+| **PartiQL** | SQL 호환 쿼리 언어 |
+
+---
+
 ## 📝 Week 6 종합 연습문제
 
 **문제 1.** DynamoDB 항목의 최대 크기는?

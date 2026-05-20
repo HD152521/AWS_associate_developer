@@ -76,6 +76,94 @@ WCU = ceil(2.5KB/1KB) x 1 = 3 WCU
 
 ---
 
+## 🧠 알아두면 좋은 심화 이론
+
+### Burst Capacity (시험 출제)
+
+- 미사용 RCU/WCU를 **300초(5분)** 동안 저장 → 일시적 트래픽 폭증에 사용
+- 자동 동작, 별도 설정 없음
+- 5분 누적 한도 초과는 throttling
+
+### Adaptive Capacity (자동 핫 파티션 완화)
+
+- 핫 파티션 감지 → 다른 파티션의 여유 용량 재분배
+- 즉시 적용 (이전엔 분 단위 → 2018부터 즉시)
+- 근본 해결은 키 설계
+
+### DynamoDB Auto Scaling (Provisioned 모드)
+
+```
+대상 사용률 70% 유지
+  ↓
+사용률 > 70% 분기 N분 연속 → RCU/WCU 증가
+사용률 < 70% 의 70% (49%) 분기 N분 연속 → RCU/WCU 감소
+```
+
+- 분당 4회 감소 + 일일 최대 27회 감소 한도
+- GSI별 독립 적용 가능
+
+### 온디맨드 모드 동작 (시험 함정)
+
+- 시작 시점 처리량: **이전 트래픽의 2배** 또는 최소값
+- 30분 내 트래픽 2배 증가는 처리 가능
+- 그 이상은 throttling (예열되지 않은 상태)
+- 가격: 백만 요청당 과금 + 저장량
+
+> ⚠️ **함정**: "온디맨드로 변경했더니 throttling 발생" → 초기 예열 부족. 트래픽이 2배 이상 갑자기 늘면 미리 프로비저닝 후 전환 권장.
+
+### DynamoDB Streams 상세
+
+| 항목 | 값 |
+|------|-----|
+| 보존 기간 | **24시간** (고정) |
+| 샤드 수 | 자동 (테이블 트래픽에 따라) |
+| 순서 | 파티션 키 단위 보장 |
+| 활성화 후 | 미래 변경만 캡처 (과거 데이터 X) |
+| 통합 | Lambda (ESM), KCL, Kinesis Adapter |
+
+### Kinesis Data Streams for DynamoDB (대안)
+
+- DynamoDB Streams의 24시간 보존 → **Kinesis Data Streams로 라우팅** 시 최대 **365일** 보존
+- 더 많은 컨슈머·복잡한 처리 가능
+- 시험 시나리오: "1년 동안 변경 이력 추적" → Kinesis Stream 모드
+
+### DAX (DynamoDB Accelerator) - 시험 출제
+
+- DynamoDB **마이크로초 단위** 캐시 (10x 빠름)
+- 완전 관리형, 클러스터 모드
+- **읽기 전용** (쓰기는 일반 DynamoDB)
+- 두 가지 캐시:
+  - **Item Cache** (TTL 기본 5분): GetItem/BatchGetItem
+  - **Query Cache** (TTL 기본 5분): Query/Scan
+- 강력한 일관성 읽기는 캐시 우회
+
+> 💡 시험: "DynamoDB 응답 속도 µs로" → DAX. 단, **VPC 내부에서만** 접근.
+
+### DAX vs ElastiCache (자주 헷갈림)
+
+| 항목 | DAX | ElastiCache |
+|------|-----|-------------|
+| 대상 | DynamoDB 전용 | 모든 DB / 캐시 |
+| 일관성 | DDB와 통합 (eventual) | 별도 관리 필요 |
+| API 호환 | DDB SDK 그대로 | 별도 코드 |
+| 사용 | 단순 캐싱 | 세션, Pub/Sub, 복잡 |
+
+### Global Tables (시험 출제)
+
+- **다중 리전 활성/활성** 복제
+- Streams 활성화 필요
+- 마지막 쓰기 우선 (Last Writer Wins)
+- 사용: 글로벌 사용자, 재해 복구
+
+### 관련 서비스 Cross-Reference
+
+- **DAX ↔ ElastiCache** → 이 페이지에서 비교
+- **Streams ↔ Lambda** → [Week 3 Day 2]
+- **Kinesis Data Streams** → [Week 11 Day 4]
+- **Global Tables + KMS Multi-Region Key** → [Week 9]
+
+---
+
 ## 아키텍처 다이어그램
 
 `
