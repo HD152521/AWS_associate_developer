@@ -122,6 +122,108 @@ sqs.set_queue_attributes(
 
 ---
 
+## 🧠 알아두면 좋은 심화 이론
+
+### SQS 핵심 한도 (시험 빈출 - 숫자 외우기)
+
+| 항목 | 값 |
+|------|-----|
+| 메시지 최대 크기 | **256 KB** (S3와 연동 시 2GB Extended Library) |
+| 보존 기간 | 60초 ~ **14일** (기본 4일) |
+| 가시성 타임아웃 | 0초 ~ **12시간** (기본 30초) |
+| 메시지 지연 | 0초 ~ 15분 (Delay Queue) |
+| 메시지 그룹 (FIFO) | 메시지 그룹 단위 순서 보장 |
+| **표준 큐 처리량** | **무제한** |
+| **FIFO 큐 처리량** | 300 msg/s (배치 3000 msg/s), 고처리량 모드 시 70,000 msg/s |
+| 인-flight 메시지 | 표준 120,000 / FIFO 20,000 |
+
+### Short Polling vs Long Polling (시험 자주)
+
+| 항목 | Short | Long |
+|------|-------|------|
+| WaitTimeSeconds | 0 (기본) | 1~20초 |
+| 빈 응답 발생 | 자주 | 거의 없음 |
+| API 호출 비용 | 높음 | 낮음 |
+| 권장 | ❌ | ✅ |
+
+> 💡 큐 레벨에서 `ReceiveMessageWaitTimeSeconds=20` 기본 설정 권장.
+
+### 메시지 가시성 타임아웃 디테일
+
+```
+메시지 수신
+   ↓ 가시성 타임아웃 시작 (기본 30초)
+처리 중...
+   ↓
+   ┌─ 처리 성공 → DeleteMessage → 큐에서 영구 삭제
+   ├─ 타임아웃 초과 → 큐에 재출현
+   └─ ChangeMessageVisibility로 연장 가능
+```
+
+> ⚠️ **함정**: 처리 시간이 가시성 타임아웃보다 길면 **같은 메시지 중복 처리** 위험. Lambda는 함수 타임아웃의 6배 이상 가시성 타임아웃 권장.
+
+### FIFO 큐 추가 디테일 (시험 자주)
+
+- 이름이 **`.fifo` 접미사** 필수
+- **MessageDeduplicationId**: 5분 이내 중복 메시지 제거
+- **ContentBasedDeduplication**: SHA-256 해시 자동 dedup
+- **MessageGroupId**: 같은 그룹은 순서 보장, 다른 그룹은 병렬 처리
+
+```python
+sqs.send_message(
+    QueueUrl='.../my-queue.fifo',
+    MessageBody='order data',
+    MessageGroupId='customer-123',           # 그룹 내 순서 보장
+    MessageDeduplicationId='order-001'       # 5분 dedup
+)
+```
+
+### 고처리량 FIFO (High-Throughput FIFO)
+
+- 표준 FIFO: 300 msg/s
+- 고처리량 모드: **70,000 msg/s** (per group)
+- 활성화: 큐 속성에서 `FifoThroughputLimit=perMessageGroupId`
+
+### Delay Queue vs Message Delay vs Visibility Timeout
+
+| 기능 | 시점 | 적용 |
+|------|------|------|
+| **Delay Queue** | 생성 시 큐 속성 | 모든 새 메시지 |
+| **Message Timer** | 메시지 전송 시 | 개별 메시지 |
+| **Visibility Timeout** | 메시지 수신 후 | 처리 중 숨김 |
+
+### SQS Extended Client Library
+
+- 256KB 초과 메시지는 **S3에 저장 + 큐엔 참조** (최대 2GB)
+- Java/Python SDK 제공
+- 시험에 한 번씩: "큰 메시지 처리" → Extended Client
+
+### SQS 권한 모델
+
+- **SQS Access Policy** (리소스 기반): 다른 계정 접근, SNS 구독
+- **IAM Policy**: 같은 계정 내 권한
+
+### SQS 암호화
+
+- **SSE-SQS** (기본): AWS 관리
+- **SSE-KMS**: 고객 키 (감사 + 회전)
+- 클라이언트 사이드 암호화 가능
+
+### DLQ 디테일 (시험 매우 빈출)
+
+- DLQ는 **같은 유형** (표준 ↔ 표준, FIFO ↔ FIFO)
+- 보존 기간: DLQ 도착 시각 기준 (큐 보존 시간 따로 계산)
+- **재구동 (Redrive)**: DLQ → 원본 큐로 다시 보내기 (AWS 콘솔)
+
+### 관련 서비스 Cross-Reference
+
+- **SQS + Lambda** → [Week 3 Day 2] ESM
+- **SQS + SNS 팬아웃** → [Day 2]
+- **SQS Beanstalk Worker** → [Week 8 Day 4]
+- **SQS + EventBridge Pipes** → [Week 10 Day 3]
+
+---
+
 ## 아키텍처 다이어그램
 
 ```

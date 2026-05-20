@@ -139,6 +139,116 @@ def lambda_handler(event, context):
 
 ---
 
+## 🧠 알아두면 좋은 심화 이론
+
+### Kinesis 4종 서비스 정확한 비교 (시험 빈출)
+
+| 서비스 | 용도 | 관리 수준 |
+|--------|------|-----------|
+| **Data Streams** | 실시간 스트리밍 (직접 처리) | 샤드 관리 (또는 On-Demand) |
+| **Data Firehose** | ETL → S3/Redshift/OpenSearch | 완전 관리형 |
+| **Data Analytics for Apache Flink** | SQL/Flink로 스트리밍 분석 | 관리형 |
+| **Video Streams** | 비디오 스트리밍 (CCTV, IoT) | 관리형 |
+
+### Kinesis Data Streams 용량 모드 (시험 신규)
+
+| 모드 | 동작 |
+|------|------|
+| **Provisioned** | 샤드 수 직접 지정 |
+| **On-Demand** (2021~) | 자동 확장, 한도 200 MB/s 또는 200,000 RPS |
+
+### 샤드 한도 정리 (정확히)
+
+| 동작 | 한도 |
+|------|------|
+| **쓰기** | 1 MB/s 또는 1,000 records/s (per shard) |
+| **읽기 (Classic)** | 2 MB/s 또는 5 GetRecords/s (모든 consumer 공유) |
+| **읽기 (Enhanced Fan-Out)** | 2 MB/s **per consumer** (HTTP/2 push) |
+| 데이터 보존 | 24시간~365일 |
+| 최대 레코드 크기 | 1 MB |
+| 파티션 키 길이 | 1~256 자 |
+
+### Enhanced Fan-Out (시험에 가끔 출제)
+
+- 클래식: 여러 컨슈머가 같은 2 MB/s 공유
+- Enhanced: 각 컨슈머가 2 MB/s 전용
+- 비용 추가 (시간당 + 전송량)
+- HTTP/2 푸시 → 70 ms 지연
+
+### Producer 옵션
+
+| 도구 | 사용 |
+|------|------|
+| **KPL** (Kinesis Producer Library) | 배치·재시도·CloudWatch 자동, Java |
+| **Kinesis Agent** | 로그 파일 자동 수집 |
+| **AWS SDK** | 단순한 직접 호출 |
+| **Kinesis Client Library (KCL)** | Consumer용 |
+
+### Consumer 옵션
+
+| 도구 | 사용 |
+|------|------|
+| **KCL** | 분산 처리, 체크포인트, 셰일 자동 |
+| **Lambda** (ESM) | 서버리스, 자동 확장 |
+| **Firehose** | S3로 자동 전달 |
+| **Data Analytics** | SQL/Flink 분석 |
+
+### Firehose 디테일 (시험 자주)
+
+| 항목 | 값 |
+|------|-----|
+| 데이터 변환 | Lambda (선택) |
+| 데이터 포맷 변환 | JSON → Parquet/ORC (자동) |
+| 압축 | GZIP, ZIP, Snappy |
+| 버퍼링 | 크기 (1~128 MB) 또는 시간 (60~900 초) |
+| 백업 | S3 백업 (실패 또는 모든 데이터) |
+| 가격 | 수집 GB당 |
+| 지연 | **최소 60초** (실시간 X) |
+
+### Firehose 대상
+
+| 대상 | 비고 |
+|------|------|
+| **S3** | 가장 일반적 |
+| **Redshift** | S3 경유 → COPY 명령 |
+| **OpenSearch** | 직접 인덱싱 |
+| **Splunk** | HEC 엔드포인트 |
+| **HTTP Endpoint** | 사용자 정의 |
+| **3rd party** (Datadog, MongoDB, New Relic 등) | |
+
+### Kinesis vs SQS vs SNS - 결정 표 (시험 시나리오 매우 빈출)
+
+| 시나리오 | 선택 |
+|----------|------|
+| 비동기 작업 큐 | **SQS** |
+| 한 번 발행 → 여러 수신 | **SNS** |
+| 실시간 로그 스트리밍 + 재처리 | **Kinesis Data Streams** |
+| 로그 → S3 저장 (서버리스 ETL) | **Firehose** |
+| 백만 RPS 이벤트 처리 | **Kinesis (On-Demand)** |
+| 순서·정확히 1회 | **SQS FIFO** |
+| 모바일 앱 푸시 | **SNS Mobile Push** |
+
+### Kinesis Data Analytics (Apache Flink)
+
+- 스트리밍 데이터에 SQL/Flink 적용
+- 윈도우 함수 (sliding, tumbling)
+- 시험엔 거의 안 나옴 (Developer 시험 범위)
+
+### MSK (Managed Kafka) - 시험에 가끔
+
+- Apache Kafka 호환 (Kinesis와 비슷한 역할)
+- 기존 Kafka 사용자가 마이그레이션 시
+- Kinesis vs MSK: AWS 네이티브 vs 표준 Kafka
+
+### 관련 서비스 Cross-Reference
+
+- **Kinesis + Lambda ESM** → [Week 3 Day 2]
+- **DDB Streams ↔ Kinesis Streams for DDB** → [Week 6 Day 3]
+- **Firehose ↔ S3 Athena** → 데이터 레이크
+- **CloudWatch Logs Subscription → Firehose** → [Week 10 Day 1]
+
+---
+
 ## 아키텍처 다이어그램
 
 ```

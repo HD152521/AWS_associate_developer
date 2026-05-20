@@ -154,6 +154,82 @@ type Subscription {
 - RDS (RDS Proxy)
 - HTTP 엔드포인트
 - Elasticsearch/OpenSearch
+- EventBridge
+
+### 4-1. Step Functions 표준 vs Express (시험 매우 빈출)
+
+| 항목 | Standard | Express |
+|------|----------|---------|
+| 최대 실행 시간 | **1년** | **5분** |
+| 실행 모델 | 정확히 1회 | At-least-once |
+| 실행 이력 | CloudWatch + 콘솔 (90일) | CloudWatch Logs만 |
+| 비용 모델 | 상태 전환당 ($0.025/1000) | 실행 시간 + 메모리 |
+| 처리량 | 2,000 starts/s | 100,000 starts/s |
+| 사용 | 긴 워크플로 (인간 승인, 배포) | 짧고 빈번 (이벤트 처리) |
+
+### 4-2. Step Functions 신규 상태 유형
+
+| 상태 | 용도 |
+|------|------|
+| **Task** | 작업 (Lambda, SNS, SQS, ECS, Glue 등 100+ 서비스) |
+| **Choice** | 조건 분기 |
+| **Parallel** | 여러 브랜치 동시 |
+| **Map** | 배열 항목별 반복 (병렬) |
+| **Wait** | 대기 |
+| **Pass** | 데이터 변환만 |
+| **Succeed / Fail** | 종료 |
+
+### Distributed Map (2022 신규)
+
+- 대용량 데이터를 병렬 처리 (수만 개 동시)
+- S3 객체별, JSON 배열 항목별
+- 시험에 가끔 등장: "S3 1억 개 파일 처리" → Distributed Map
+
+### Task의 Service Integration 패턴 (시험에 자주)
+
+| 패턴 | URI 형식 | 동작 |
+|------|----------|------|
+| **Request Response** | `arn:aws:states:::lambda:invoke` | 호출 후 응답 |
+| **Run a Job (.sync)** | `arn:aws:states:::ecs:runTask.sync` | 완료까지 대기 |
+| **Wait for Callback (.waitForTaskToken)** | `arn:aws:states:::sqs:sendMessage.waitForTaskToken` | 외부 callback 토큰 |
+
+> 💡 .waitForTaskToken: 인간 승인, 외부 시스템 응답 대기 등에 활용.
+
+### 4-3. AppSync 디테일
+
+- **Resolver**: GraphQL 필드 → 데이터 소스 매핑 (VTL 또는 JavaScript)
+- **Pipeline Resolver**: 여러 단계의 리졸버 체인
+- **Caching**: 서버 측 결과 캐싱
+- **WAF 통합**: 가능
+- **인증 방법**: API_KEY / IAM / Cognito User Pool / OIDC / Lambda Authorizer
+
+### AppSync vs API Gateway (시험에 가끔)
+
+| 항목 | AppSync | API Gateway |
+|------|---------|-------------|
+| 프로토콜 | GraphQL + WebSocket | REST + HTTP + WebSocket |
+| 데이터 소스 | 다중 (한 쿼리에서) | 단일 백엔드 |
+| 실시간 구독 | ✅ 내장 | WebSocket API 별도 |
+| 캐싱 | 응답 수준 | 메서드 수준 |
+| 사용 | 모바일·복잡한 쿼리 | 일반 REST API |
+
+### Step Functions 활용 패턴 (시험 시나리오)
+
+| 패턴 | 설명 |
+|------|------|
+| **Saga** | 분산 트랜잭션 보상 |
+| **Long-Running ETL** | Glue + Athena + Lambda |
+| **인간 승인** | .waitForTaskToken |
+| **재시도 + 백오프** | Retry 정책 |
+| **병렬 검증** | Parallel state |
+| **Map (배열 처리)** | Map state |
+
+### 관련 서비스 Cross-Reference
+
+- **Step Functions ↔ Lambda 15분 한도 우회**
+- **AppSync ↔ Cognito** → [Week 9 Day 3] 인증
+- **Step Functions ↔ EventBridge** → 워크플로 트리거
+- **AppSync ↔ DynamoDB** → 직접 통합 (Lambda 없이 CRUD)
 
 ### 5. AppSync 실시간 구독
 

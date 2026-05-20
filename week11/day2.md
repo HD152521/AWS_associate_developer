@@ -139,6 +139,106 @@ response = sns.create_topic(
 
 ---
 
+## 🧠 알아두면 좋은 심화 이론
+
+### SNS 핵심 한도 (시험에 가끔)
+
+| 항목 | 값 |
+|------|-----|
+| 주제 수 (계정/리전) | 100,000 |
+| 구독자 수 (주제당) | 12,500,000 |
+| 메시지 크기 | **256 KB** (SQS와 동일) |
+| SNS Extended Client | 최대 2GB (S3 경유) |
+| 메시지 보존 | **없음** (전달 실패 시 사라짐) |
+| 발행 처리량 | 무제한 (FIFO는 300 msg/s) |
+
+### SNS 구독 프로토콜 (시험 자주)
+
+| 프로토콜 | 대상 |
+|----------|------|
+| **HTTPS** | 웹훅 (자동 재시도 정책 적용) |
+| **HTTP** | 웹훅 (TLS X, 비권장) |
+| **Email** | 이메일 (제목·본문) |
+| **Email-JSON** | 이메일 (JSON 형식) |
+| **SMS** | 모바일 문자 |
+| **SQS** | 큐로 전달 |
+| **Lambda** | 함수 직접 호출 |
+| **Mobile Push** | APNs, GCM, FCM, ADM, Baidu |
+| **Kinesis Data Firehose** | S3·Redshift·OpenSearch로 |
+
+### 재시도 정책 (HTTPS 구독)
+
+```json
+{
+  "deliveryPolicy": {
+    "numRetries": 50,
+    "numNoDelayRetries": 3,
+    "minDelayTarget": 20,
+    "maxDelayTarget": 600
+  }
+}
+```
+
+- 기본 50회 재시도, 1시간 동안
+- 실패 시 → SNS DLQ로 (Lambda Destinations 유사)
+
+### Message Filtering 디테일 (시험 시나리오)
+
+```json
+{
+  "store": ["seoul", "busan"],
+  "event": [{ "anything-but": "test_event" }],
+  "price": [{ "numeric": [">", 100] }],
+  "size": [{ "exists": true }]
+}
+```
+
+- 메시지 본문 필터링 (2022~): `subscriptionAttributes.FilterPolicyScope=MessageBody`
+- 기본은 MessageAttributes만 필터
+
+### SNS FIFO + SQS FIFO 통합
+
+```
+[Producer FIFO] → SNS FIFO Topic → SQS FIFO Queue 1
+                                 → SQS FIFO Queue 2
+                                 (Consumer는 같은 그룹 ID 사용)
+```
+
+- 순서·중복 제거 양 끝단에서 보장
+- 메시지 그룹 ID 사용
+
+### SNS Mobile Push (시험 가끔)
+
+| 플랫폼 | 서비스 |
+|--------|--------|
+| iOS | **APNs** (Apple Push Notification) |
+| Android | **GCM/FCM** (Firebase) |
+| Amazon | **ADM** |
+| Windows | WNS (deprecated) |
+
+- 디바이스 토큰을 SNS에 등록 → endpoint ARN 생성
+
+### SNS Data Protection Policy (PII 마스킹)
+
+- 메시지에서 신용카드·SSN 등 자동 탐지·마스킹
+- 시험엔 거의 안 나옴 (Macie와 함께)
+
+### SNS 비용
+
+- 발행 100만건: $0.50 (HTTPS), $2.00 (SMS는 국가별)
+- SQS 구독: 무료
+- Email/Lambda 호출: 별도 비용
+
+### 관련 서비스 Cross-Reference
+
+- **SNS + SQS 팬아웃** → [Day 1]
+- **SNS + Lambda** → 비동기 호출
+- **SNS + Mobile Push** → 모바일 앱 알림
+- **SNS + CloudWatch Alarms** → 알람 알림
+- **SNS Topic Encryption** → KMS
+
+---
+
 ## 아키텍처 다이어그램
 
 ```

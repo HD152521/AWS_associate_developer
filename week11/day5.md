@@ -65,6 +65,72 @@ Firehose 최소 지연: 1분
 
 ---
 
+## 🧠 Week 11 시험 함정 & 약어
+
+### 헷갈리는 비교
+
+| A | B | 핵심 |
+|---|---|------|
+| SQS Standard | SQS FIFO | 무제한·순서X vs 300/s·순서·dedup |
+| SQS | SNS | Pull·하나만 vs Push·다중 |
+| SNS | EventBridge | Pub/Sub vs 이벤트 필터·라우팅 |
+| Kinesis Data Streams | SQS | 다중 Consumer·재처리 vs 단일·소비 후 사라짐 |
+| Kinesis | Firehose | 직접 처리 vs 자동 S3·1분+ |
+| Kinesis Provisioned | On-Demand | 샤드 직접 vs 자동 200MB/s |
+| Classic Fan-Out | Enhanced Fan-Out | 공유 2MB/s vs 컨슈머별 2MB/s |
+| KPL | KCL | Producer·Java vs Consumer·체크포인트 |
+| Step Functions Standard | Express | 1년·정확히1회·비쌈 vs 5분·at-least-once·저렴 |
+| Map | Distributed Map | 일반 병렬 vs 대용량(수만) |
+| .sync | .waitForTaskToken | 완료 대기 vs 외부 callback |
+| AppSync | API Gateway | GraphQL·다중 소스 vs REST·단일 |
+| SQS Long Polling | Short Polling | 20초 대기 vs 즉시 |
+| Visibility Timeout | Message Retention | 처리 중 숨김 vs 보존 |
+| SNS DLQ | Lambda DLQ | SNS 전달 실패 vs Lambda 비동기 실패 |
+
+### Week 11 시험 함정 18가지
+
+1. **SQS 256KB 한도** — 초과 시 Extended Client (S3)
+2. **SQS 보존 1분~14일, 기본 4일**
+3. **SQS 가시성 타임아웃 기본 30초, 최대 12시간**
+4. **SQS FIFO 300 msg/s (배치 3000)**, 고처리량 모드 70000
+5. **Long Polling = WaitTimeSeconds 1~20**
+6. **DLQ는 같은 유형끼리만** (FIFO ↔ FIFO)
+7. **SNS 보존 없음** — 전달 실패 시 사라짐 (DLQ 설정 필요)
+8. **SNS 메시지 본문 필터링은 옵션 활성화 필요**
+9. **SNS FIFO는 SQS FIFO만 구독 가능**
+10. **Kinesis 샤드 쓰기 1 MB/s · 1000 RPS**, 읽기 2 MB/s
+11. **Enhanced Fan-Out = 컨슈머별 전용 2 MB/s** (비용 ↑)
+12. **Kinesis 보존 24시간 ~ 365일** (Streams), Firehose 보존 X
+13. **Firehose 최소 지연 60초**, 실시간 아님
+14. **Kinesis On-Demand 200 MB/s 한도**
+15. **Step Functions Standard 최대 1년, Express 5분**
+16. **Distributed Map = 대용량 S3 파일·JSON 배열**
+17. **.waitForTaskToken = 외부 시스템 응답 대기**
+18. **AppSync = GraphQL + WebSocket (실시간 구독)**
+
+### Week 11 약어 정리
+
+| 약어 | 풀네임 |
+|------|--------|
+| **SQS** | Simple Queue Service |
+| **SNS** | Simple Notification Service |
+| **DLQ** | Dead Letter Queue |
+| **KDS** | Kinesis Data Streams |
+| **KDF** | Kinesis Data Firehose |
+| **KCL** | Kinesis Client Library |
+| **KPL** | Kinesis Producer Library |
+| **KDA** | Kinesis Data Analytics |
+| **EFO** | Enhanced Fan-Out |
+| **FIFO** | First In First Out |
+| **ESM** | Event Source Mapping |
+| **MSK** | Managed Streaming for Apache Kafka |
+| **Saga** | 분산 트랜잭션 보상 패턴 |
+| **APNs / FCM** | Apple/Google Push 서비스 |
+| **ETL** | Extract Transform Load |
+| **TPS / RPS** | Transactions/Requests Per Second |
+
+---
+
 ## 📝 Week 11 종합 연습문제
 
 **문제 1.** 결제 트랜잭션을 정확히 1회, 순서대로 처리해야 할 때?
