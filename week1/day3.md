@@ -132,6 +132,123 @@ STS는 IAM 역할을 수임(Assume)할 때 임시 보안 자격 증명을 발급
 
 ---
 
+## 🧠 알아두면 좋은 심화 이론
+
+### STS 임시 자격 증명 - 세션 시간 정확히 (시험 함정)
+
+| API | 기본 | 최대 | 비고 |
+|-----|------|------|------|
+| `AssumeRole` | 1시간 | **12시간** | 역할의 `MaxSessionDuration` 설정값까지 |
+| `AssumeRoleWithSAML` | 1시간 | 12시간 | SAML 페더레이션 |
+| `AssumeRoleWithWebIdentity` | 1시간 | 12시간 | OIDC(Google/Facebook 등) |
+| `GetSessionToken` | 12시간 | **36시간** | IAM 사용자만 (MFA 강제용) |
+| `GetFederationToken` | 12시간 | 36시간 | 페더레이션 사용자 |
+
+> ⚠️ **함정**: "AssumeRole 최대 시간"으로 자주 출제. 정답은 **12시간**. 또한 **역할 체인(Role Chaining)**(역할 A → AssumeRole 역할 B) 시 최대 1시간으로 강제 제한됨.
+
+### 신뢰 정책 vs 권한 정책 - 헷갈리는 핵심
+
+| 구분 | Trust Policy | Permission Policy |
+|------|--------------|-------------------|
+| 역할 | "**누가** 이 역할을 수임할 수 있나?" | "이 역할로 **무엇을** 할 수 있나?" |
+| `Principal` 필드 | 있음 (필수) | 없음 |
+| 부착 위치 | 역할 자체에만 1개 | 여러 정책 부착 가능 |
+
+```json
+// 신뢰 정책 (Trust Policy) - 누가 수임할 수 있는지
+{
+  "Version": "2012-10-17",
+  "Statement": [{
+    "Effect": "Allow",
+    "Principal": { "AWS": "arn:aws:iam::111111111111:root" },
+    "Action": "sts:AssumeRole",
+    "Condition": {
+      "StringEquals": { "sts:ExternalId": "Unique-ID-12345" }
+    }
+  }]
+}
+```
+
+### ExternalId - "혼동된 대리인 문제(Confused Deputy)" 방지
+
+- 3자 통합(SaaS, MSP)에서 필수
+- 다른 고객 계정이 ARN만 알아도 무단 AssumeRole 못 하게 막음
+- SaaS 측이 ExternalId를 알아야만 호출 가능 → 시험 빈출 시나리오
+
+> ⚠️ **함정**: 3rd-party가 내 계정에 접근할 역할 만들 때 무조건 ExternalId 추가가 정답.
+
+### 페더레이션 유형 (3가지 - 시험에 자주 비교됨)
+
+| 유형 | API | 사용 사례 |
+|------|-----|-----------|
+| **SAML 2.0** | `AssumeRoleWithSAML` | 기업 SSO (Active Directory, Okta) |
+| **OIDC / Web Identity** | `AssumeRoleWithWebIdentity` | 모바일/웹앱 - Google, Facebook, Cognito |
+| **Custom Identity Broker** | `AssumeRole` + 자체 토큰 발급 | 자체 ID 시스템 |
+
+### SCP 동작 정확히 (시험 함정 다수)
+
+```
+유효 권한 = SCP ∩ Permissions Boundary ∩ Session Policy ∩ Identity Policy
+                (모두 Allow 있어야 함, Deny는 어디든 우선)
+```
+
+- ❌ SCP는 **권한을 부여하지 않음** — 절대 보기 함정
+- ❌ SCP가 Allow지만 IAM에서 Deny면 거부
+- ❌ SCP가 Deny면 root 계정조차 막힘 (마스터 계정 제외)
+- ✅ SCP는 기본적으로 `FullAWSAccess` 첨부됨 — 직접 만들면 deny-list 형태
+
+### 리소스 기반 정책 지원 서비스 (모두 외우기)
+
+✅ **지원**: S3 (버킷 정책), SQS, SNS, Lambda, KMS, ECR, Secrets Manager, API Gateway, EFS, EventBridge, IAM 역할(신뢰 정책)
+❌ **미지원**: EC2, RDS, DynamoDB(IAM만), CloudWatch, Auto Scaling
+
+> ⚠️ **함정**: DynamoDB는 리소스 기반 정책이 없음. 교차 계정 접근 시 무조건 IAM 역할 + AssumeRole 패턴 필요.
+
+### 실무 사례 - 교차 계정 접근 패턴 3가지
+
+**1) Hub-and-Spoke (중앙 ID 계정)**
+```
+[ID 계정] (사람 사용자만)
+    ↓ AssumeRole
+[Dev 계정] [Staging 계정] [Prod 계정]
+```
+
+**2) 리소스 공유 (S3 크로스 계정)**
+```
+Account A: 자격 증명 정책으로 s3:GetObject 허용
+Account B: 버킷 정책으로 Principal=Account A 허용
+(객체 소유권 주의 — Object Ownership 설정)
+```
+
+**3) 서비스 통합 (Lambda → 다른 계정 SQS)**
+```
+Lambda 실행 역할: sqs:SendMessage 허용
+SQS 큐 정책: Principal=Lambda 역할 ARN 허용
+```
+
+### 정책 변수 (Policy Variables) - 동적 정책
+
+```json
+{
+  "Effect": "Allow",
+  "Action": "s3:GetObject",
+  "Resource": "arn:aws:s3:::company-bucket/home/${aws:username}/*"
+}
+```
+
+자주 쓰는 변수: `${aws:username}`, `${aws:userid}`, `${aws:PrincipalTag/<key>}`, `${aws:SourceIp}`, `${aws:CurrentTime}`
+
+> 💡 ABAC 구현의 핵심: 태그 기반 정책 변수 사용.
+
+### 관련 서비스 Cross-Reference
+
+- **STS ↔ Cognito Identity Pool** → [Week 9 Day 3] (앱 → AWS 임시 자격)
+- **신뢰 정책 ↔ EC2 인스턴스 프로파일** → [Week 2 Day 1]
+- **SCP ↔ AWS Organizations Service Control** → [실무에서 보안팀이 관리]
+- **리소스 기반 정책 ↔ KMS 키 정책** → [Week 9 Day 1] (이중 권한 모델 가장 중요)
+
+---
+
 ## 아키텍처 다이어그램
 
 ```

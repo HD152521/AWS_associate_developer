@@ -71,6 +71,60 @@ AWS 책임: 클라우드 OF 보안
 
 ---
 
+## 🧠 Week 1 시험 함정 모음 (반드시 체크)
+
+### 헷갈리기 쉬운 비교표
+
+| 항목 A | 항목 B | 핵심 차이 |
+|--------|--------|-----------|
+| IAM 사용자 | IAM 역할 | 영구 자격증명 vs 임시 자격증명 |
+| 자격 증명 기반 정책 | 리소스 기반 정책 | "내가" vs "이 리소스에" |
+| 권한 경계 | SCP | 사용자 단위 상한 vs 계정/OU 단위 상한 |
+| SCP | IAM 정책 | 제한만(Allow 안 됨) vs 부여 가능 |
+| Trust Policy | Permission Policy | 누가 수임 가능 vs 무엇을 할 수 있음 |
+| AZ | 데이터 센터 | AZ는 1개 이상 DC의 묶음 |
+| 리전 | 엣지 로케이션 | 30+ vs 400+ |
+| IAM 사용자 | IAM Identity Center | 레거시 vs 권장(사람 사용자) |
+| IMDSv1 | IMDSv2 | 단일 GET vs PUT 토큰 |
+| AssumeRole | GetSessionToken | 역할 수임(최대 12h) vs 사용자 본인 강화(최대 36h) |
+
+### Week 1 자주 출제되는 함정 8가지
+
+1. **공동 책임**: "EC2 데이터 암호화는 누구 책임?" → **고객** (AWS가 KMS 키 관리해도 활성화·키 정책은 고객)
+2. **명시적 Deny**: 정책 순서·우선순위 무관, 항상 Allow를 이김
+3. **그룹 중첩 불가** + **역할은 그룹에 못 넣음** (그룹엔 사용자만)
+4. **교차 계정**: 자격증명 정책 + 리소스 정책 **둘 다 필요**
+5. **SCP**: 권한 부여 아님 — "SCP가 Allow면 OK다" → 함정 X
+6. **AssumeRole 최대 12시간**, GetSessionToken은 최대 36시간
+7. **Role Chaining 시 최대 1시간** 강제 제한
+8. **IMDSv2 토큰 방식**: SSRF 방어 → 보안 시나리오 정답
+9. **S3 ARN은 region/account 비어있음** — `arn:aws:s3:::bucket`
+10. **CLI 자격 증명 체인**: 환경변수 > 파일 > 인스턴스 메타데이터
+
+### Week 1 약어 정리
+
+| 약어 | 풀네임 | 의미 |
+|------|--------|------|
+| **IAM** | Identity and Access Management | 신원·접근 관리 |
+| **STS** | Security Token Service | 임시 자격 증명 발급 |
+| **SCP** | Service Control Policy | 조직 가드레일 |
+| **ARN** | Amazon Resource Name | 리소스 고유 식별자 |
+| **MFA** | Multi-Factor Authentication | 다중 인증 |
+| **SAML** | Security Assertion Markup Language | 기업 SSO 표준 |
+| **OIDC** | OpenID Connect | 웹 ID 페더레이션 |
+| **AZ** | Availability Zone | 가용 영역 |
+| **VPC** | Virtual Private Cloud | 가상 사설 클라우드 |
+| **ABAC** | Attribute-Based Access Control | 태그 기반 접근 제어 |
+| **RBAC** | Role-Based Access Control | 역할 기반 접근 제어 |
+| **IMDS** | Instance Metadata Service | EC2 메타데이터 서비스 |
+| **SDK** | Software Development Kit | 개발 키트(boto3 등) |
+| **CLI** | Command Line Interface | 명령줄 도구 |
+| **RTO/RPO** | Recovery Time/Point Objective | 복구 시간/지점 목표 |
+| **SLA** | Service Level Agreement | 가동률 보장 |
+| **JMESPath** | (쿼리 언어) | CLI `--query` 옵션 |
+
+---
+
 ## 아키텍처 다이어그램 - Week 1 전체 개요
 
 ```

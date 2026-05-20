@@ -77,6 +77,85 @@ AWS와 고객은 클라우드 보안에 대한 책임을 공유합니다.
 
 ---
 
+## 🧠 알아두면 좋은 심화 이론
+
+### 글로벌 인프라 추가 구성 요소 (시험 출제)
+
+| 구성 요소 | 설명 | 사용 사례 |
+|-----------|------|-----------|
+| **Local Zones** | 인구 밀집 지역에 위치한 리전 확장. 1ms 이내 초저지연 | 게임, 미디어/영상, 실시간 ML |
+| **Wavelength Zones** | 통신사 5G 네트워크 엣지에 배포 | 5G 모바일 앱, IoT |
+| **Outposts** | 고객 데이터 센터에 설치되는 AWS 하드웨어 | 온프레미스 규제, 하이브리드 |
+| **AWS Global Accelerator** | 정적 IP 2개로 글로벌 트래픽 라우팅(엣지 통과) | 비-HTTP 워크로드 가속 |
+| **GovCloud / China Regions** | 격리된 별도 파티션 (`aws-us-gov`, `aws-cn`) | 미국 정부/중국 컴플라이언스 |
+
+> ⚠️ **함정**: `aws-cn` 및 `aws-us-gov`는 일반 AWS 계정으로 접근 불가. ARN 파티션이 `aws`가 아니라 `aws-cn`/`aws-us-gov`로 다름. IAM/Route 53 등은 글로벌 서비스지만 GovCloud/China는 별도 파티션.
+
+### 서비스 범위 분류 (헷갈리기 쉬움)
+
+| 범위 | 대표 서비스 |
+|------|-------------|
+| **글로벌** | IAM, Route 53, CloudFront, WAF (CloudFront에 붙는 경우), STS(엔드포인트는 리전 선택 가능) |
+| **리전** | S3(버킷은 리전에 종속), EC2, Lambda, DynamoDB, RDS, SQS, SNS, KMS |
+| **AZ** | EBS 볼륨, 서브넷, RDS 인스턴스(Multi-AZ로 확장) |
+
+> ⚠️ **함정**: S3 버킷 이름은 글로벌 네임스페이스(전 세계 유일)지만, 데이터는 특정 리전에 저장됨. 시험에서 "S3는 글로벌 서비스" → 반은 맞고 반은 틀림.
+
+### 가용성·내구성·복원력 용어 (시험 빈출)
+
+| 약어 | 풀네임 | 의미 |
+|------|--------|------|
+| **RTO** | Recovery Time Objective | 장애 발생 후 복구까지 허용 시간 |
+| **RPO** | Recovery Point Objective | 허용 가능한 데이터 손실 시간 |
+| **SLA** | Service Level Agreement | AWS의 가동률 보장 (예: EC2 99.99%) |
+| **HA** | High Availability | 다중 AZ로 설계 |
+| **DR** | Disaster Recovery | 다중 리전으로 설계 |
+
+**DR 전략 4가지 (비용 vs RTO/RPO trade-off):**
+1. **Backup & Restore** — 가장 저렴, RTO 시간 단위
+2. **Pilot Light** — 핵심만 켜둠
+3. **Warm Standby** — 축소된 환경 상시 운영
+4. **Multi-Site Active-Active** — 가장 빠름, 가장 비쌈
+
+### 실무 사례 - 멀티 AZ 아키텍처 패턴
+
+```
+        Route 53 (글로벌 DNS)
+              |
+      Application Load Balancer
+         /              \
+      [AZ-a]          [AZ-b]
+       EC2             EC2
+       RDS Primary --- RDS Standby (동기 복제)
+       ElastiCache    ElastiCache
+```
+
+- ALB는 자동으로 다중 AZ에 트래픽 분산
+- RDS Multi-AZ는 동기 복제 + 자동 페일오버 (RTO 1~2분)
+- AZ 하나 장애 시에도 서비스 무중단
+
+### 공동 책임 - 서비스별 비교표 (시험 빈출 함정)
+
+| 서비스 | OS 패치 | DB 엔진 패치 | 데이터 암호화 | 백업 설정 |
+|--------|---------|--------------|----------------|-----------|
+| **EC2** | 고객 | - | 고객 | 고객 |
+| **RDS** | AWS | AWS | 고객(KMS 키 선택) | 고객(보존 기간) |
+| **Lambda** | AWS | - | AWS(전송)+고객(저장) | - |
+| **S3** | AWS | - | 고객(SSE 옵션) | 고객(버전·복제) |
+| **DynamoDB** | AWS | AWS | 기본 활성화 | 고객(PITR) |
+| **Fargate** | AWS | - | 고객 | 고객 |
+
+> 💡 **암기 팁**: "관리형(Managed)일수록 AWS가 책임 ↑". EC2는 IaaS라 고객 책임이 많고, Lambda/DynamoDB는 거의 AWS가 다 함.
+
+### 관련 서비스 Cross-Reference
+
+- **글로벌 인프라 → CloudFront, Route 53** (Week 4·10에서 다시 등장)
+- **공동 책임 → IAM** (Day 2~3에서 "고객 책임의 핵심")
+- **AZ → EC2 Auto Scaling, ELB** (Week 2)
+- **리전 선택 → KMS 키, S3 버킷 위치** (Week 5·9)
+
+---
+
 ## 아키텍처 다이어그램
 
 ```

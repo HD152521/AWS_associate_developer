@@ -196,6 +196,128 @@ aws s3api list-buckets \
 
 ---
 
+## 🧠 알아두면 좋은 심화 이론
+
+### IMDSv1 vs IMDSv2 (시험 매우 자주 출제)
+
+| 항목 | IMDSv1 | IMDSv2 |
+|------|--------|--------|
+| 요청 방식 | 단순 GET | **PUT으로 토큰 발급 → GET에 토큰 헤더** |
+| 보안 | SSRF 취약 | SSRF 방어 (헤더 기반) |
+| 현재 권장 | ❌ 비권장 | ✅ 권장 (신규 인스턴스 기본값) |
+
+```bash
+# IMDSv2 호출 (2단계)
+TOKEN=$(curl -X PUT "http://169.254.169.254/latest/api/token" \
+  -H "X-aws-ec2-metadata-token-ttl-seconds: 21600")
+
+curl -H "X-aws-ec2-metadata-token: $TOKEN" \
+  http://169.254.169.254/latest/meta-data/iam/security-credentials/<role-name>
+```
+
+> ⚠️ **함정**: 메타데이터 호출이 컨테이너(ECS/EKS)에서 막히는 케이스 — `hop limit` 기본값이 1이라 컨테이너 네트워크에서 접근 불가. 컨테이너에서는 **`AWS_CONTAINER_CREDENTIALS_RELATIVE_URI`** 환경변수를 통해 자동 주입됨(ECS Task Role).
+
+### EC2 인스턴스 메타데이터 주요 경로 (자주 출제)
+
+```
+/latest/meta-data/instance-id
+/latest/meta-data/instance-type
+/latest/meta-data/local-ipv4
+/latest/meta-data/public-ipv4
+/latest/meta-data/placement/availability-zone
+/latest/meta-data/placement/region          ← 현재 리전 확인
+/latest/meta-data/iam/security-credentials/<role-name>  ← 임시 자격증명
+/latest/user-data                            ← 부팅 스크립트
+/latest/dynamic/instance-identity/document   ← 서명된 인스턴스 정보
+```
+
+### SDK 자격 증명 체인 (CLI와 거의 동일)
+
+```
+1. 명시적 자격 증명 (코드에 전달된 키)
+2. 환경 변수 (AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, AWS_SESSION_TOKEN)
+3. AWS_PROFILE 환경 변수가 가리키는 프로파일
+4. ~/.aws/credentials  (default 또는 지정 프로파일)
+5. ~/.aws/config의 source_profile / sso_session
+6. 컨테이너 자격 증명 (ECS Task Role, AWS_CONTAINER_CREDENTIALS_*)
+7. EC2 인스턴스 프로파일 (IMDS)
+```
+
+> ⚠️ **함정**: boto3가 자격 증명을 못 찾을 때 NoCredentialsError. 환경변수 오타나 프로파일 이름 불일치가 99%의 원인.
+
+### CLI 핵심 글로벌 옵션
+
+| 옵션 | 설명 |
+|------|------|
+| `--profile <name>` | 자격 증명 프로파일 지정 |
+| `--region <region>` | 리전 오버라이드 |
+| `--output {json,table,text,yaml}` | 출력 포맷 |
+| `--query <jmespath>` | JMESPath 응답 필터 |
+| `--debug` | 전체 디버그 로그 |
+| `--dry-run` | 권한만 확인, 실제 실행 X (지원 시) |
+| `--no-cli-pager` | less 페이저 끔 (스크립트용) |
+| `--cli-binary-format raw-in-base64-out` | Lambda invoke 페이로드 처리 |
+
+### SDK 재시도 / 백오프 (시험 출제 — Troubleshooting 도메인)
+
+- **기본**: 표준(Standard) 재시도 모드 — 최대 3회 재시도, 지수 백오프 + jitter
+- **Adaptive** 모드: 클라이언트 측 토큰 버킷으로 트래픽 조절
+- 환경변수로 제어: `AWS_RETRY_MODE`, `AWS_MAX_ATTEMPTS`
+- SDK 자동 처리 오류 코드: `ProvisionedThroughputExceededException`, `ThrottlingException`, `429`, `5xx`
+
+> 💡 시험 시나리오: "DynamoDB가 throttling으로 실패해요" → 답은 보통 "SDK 재시도가 자동으로 처리하지만, 백오프/배치 크기/RCU·WCU 늘리기 검토".
+
+### IAM Roles Anywhere (온프레미스 → AWS)
+
+- 온프레미스 서버가 X.509 인증서로 IAM 역할 수임
+- `~/.aws/credentials`의 `credential_process`로 자동 연동
+- 시험에 가끔: "온프레미스 서버에서 키 없이 AWS 접근하는 법" → IAM Roles Anywhere
+
+### AWS SDK 주요 언어별 명칭 (헷갈리기 쉬움)
+
+| 언어 | SDK 명 |
+|------|--------|
+| Python | **boto3** |
+| Java | AWS SDK for Java v2 |
+| JavaScript | AWS SDK for JavaScript v3 (모듈식: `@aws-sdk/client-s3`) |
+| Go | AWS SDK for Go v2 |
+| .NET | AWS SDK for .NET |
+| C++ | AWS SDK for C++ |
+| Ruby | AWS SDK for Ruby v3 |
+
+### 환경 변수 치트시트
+
+```bash
+AWS_ACCESS_KEY_ID
+AWS_SECRET_ACCESS_KEY
+AWS_SESSION_TOKEN              # STS 임시 자격증명 사용시 필수
+AWS_DEFAULT_REGION             # CLI 기본 리전
+AWS_REGION                     # SDK 기본 리전
+AWS_PROFILE                    # 사용할 프로파일
+AWS_CONFIG_FILE                # 기본 ~/.aws/config 오버라이드
+AWS_SHARED_CREDENTIALS_FILE    # 기본 ~/.aws/credentials 오버라이드
+AWS_RETRY_MODE                 # legacy|standard|adaptive
+AWS_MAX_ATTEMPTS
+AWS_EC2_METADATA_DISABLED      # IMDS 호출 끄기
+```
+
+### CloudShell 상세 (시험에서 디테일 묻기 좋음)
+
+- 리전별 인스턴스 (선택한 리전에서 동작)
+- **1GB 영구 홈 디렉토리** (`/home/cloudshell-user`)
+- 120일 미접속 시 홈 디렉토리 삭제
+- 무료 + 자동 자격 증명 (로그인 사용자의 IAM 권한 그대로)
+- 사전 설치: AWS CLI v2, Python, Node.js, npm, jq, git, Docker(일부 리전)
+
+### 관련 서비스 Cross-Reference
+
+- **EC2 인스턴스 프로파일** → [Week 2 Day 1]
+- **Lambda 환경 변수 / Secrets Manager** → [Week 3 Day 3, Week 9 Day 2]
+- **CloudFormation 파라미터** → [Week 12 Day 5]
+- **SDK 재시도/throttling** → [Week 6 DynamoDB, Week 10 X-Ray로 추적]
+
+---
+
 ## 아키텍처 다이어그램
 
 ```
