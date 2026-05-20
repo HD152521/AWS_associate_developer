@@ -53,6 +53,100 @@ Beanstalk: .ebextensions, Immutable이 가장 안전
 
 ---
 
+## 🧠 도메인 2·3·4 - 보안·배포·모니터링 시험 직전 압축
+
+### KMS 함정 모음
+
+| 함정 | 정답 |
+|------|------|
+| "Encrypt API 한도?" | **4 KB** |
+| "AWS Managed Key 회전?" | **1년** (2022+ 변경) |
+| "CMK 비용?" | **$1/월** + API 호출 |
+| "Multi-Region Key 용도?" | CRR, DDB Global, 멀티 리전 |
+| "Key Policy 없으면?" | IAM 정책으로는 접근 불가 |
+| "Bucket Key 효과?" | SSE-KMS 비용 99% ↓ |
+| "Grant 용도?" | 임시·일회용 권한 (Key Policy 수정 X) |
+| "KMS API 한도?" | 키당 5,500~30,000 RPS |
+| "FIPS 140-2 Level 3?" | **CloudHSM** |
+| "DEK?" | Data Encryption Key (Envelope) |
+
+### Secrets Manager vs Parameter Store
+
+| 항목 | Secrets Manager | Parameter Store |
+|------|-----------------|-----------------|
+| 자동 회전 | ✅ | ❌ |
+| 비용 | $0.40/비밀 | 표준 무료 |
+| 크기 | 64KB | 4/8KB |
+| RDS 통합 | ✅ | ❌ |
+
+### Cognito 함정
+
+| 함정 | 정답 |
+|------|------|
+| "User Pool vs Identity Pool?" | 인증(JWT) vs IAM 임시 자격 |
+| "ID Token vs Access Token?" | 사용자 정보 vs API 접근 |
+| "Refresh Token 최대?" | **10년** |
+| "API GW Cognito Authorizer 기본 토큰?" | **ID Token** |
+| "HTTP API JWT Authorizer 기본 토큰?" | **Access Token** |
+| "Lambda 트리거 개수?" | 11개 (PreSignUp 등) |
+
+### WAF·Shield·ACM 함정
+
+| 함정 | 정답 |
+|------|------|
+| "WAF 적용 안 되는 곳?" | NLB, HTTP API (직접) |
+| "Shield Advanced 비용?" | **$3,000/월** + 데이터 |
+| "Shield Advanced 혜택?" | 비용 보호 + SRT(24/7) + WAF 포함 |
+| "ACM CloudFront 인증서 리전?" | **us-east-1 강제** |
+| "EC2에 ACM 직접 설치?" | **불가** |
+| "Private CA 비용?" | $400/월 |
+
+### CloudWatch 함정
+
+| 함정 | 정답 |
+|------|------|
+| "EC2 기본 모니터링 간격?" | **5분** (Detailed = 1분) |
+| "EC2 기본 지표에 없는 것?" | 메모리, 디스크 사용량 |
+| "CloudWatch Logs 기본 보존?" | **무기한** |
+| "Logs 단일 PutLogEvents?" | **1 MB** |
+| "EMF 용도?" | Lambda에서 PutMetricData API 없이 지표 |
+| "Anomaly Detection?" | ML 기반 자동 임계값 |
+
+### X-Ray 함정
+
+| 함정 | 정답 |
+|------|------|
+| "Lambda 활성화?" | Active Tracing 토글 |
+| "EC2/ECS 활성화?" | X-Ray Daemon (UDP 2000) |
+| "ALB X-Ray?" | **미지원** |
+| "Annotation vs Metadata?" | 인덱싱·필터 가능 vs 불가 |
+| "Annotation 한도?" | **50개** |
+| "기본 샘플링?" | 처음 1개 + 초당 5% |
+| "ServiceLens?" | X-Ray + CloudWatch 통합 |
+
+### CloudTrail 함정
+
+| 함정 | 정답 |
+|------|------|
+| "기본 보존 (콘솔 조회)?" | **90일** |
+| "Data Events 기본?" | **비활성화** |
+| "Multi-region vs Organization Trail?" | 리전 전체 vs 계정 전체 |
+| "CloudTrail Lake?" | 7년 SQL 분석 데이터 레이크 |
+
+### CI/CD 함정
+
+| 함정 | 정답 |
+|------|------|
+| "buildspec 순서?" | install → pre_build → build → post_build |
+| "appspec EC2 vs Lambda?" | YAML 10훅 vs YAML 2훅 |
+| "Lambda Canary10Percent5Minutes?" | 10% → 5분 후 100% |
+| "ECS 배포 전략?" | **Blue/Green만** |
+| "Beanstalk 가장 안전?" | **Immutable** 또는 **Blue/Green** |
+| "Manual Approval 만료?" | **7일** 응답 없으면 거부 |
+| "EC2 CodeDeploy 필수?" | **Agent 설치** |
+
+---
+
 ## 📝 최종 모의고사 - Part 3
 
 **문제 1.** 100MB 파일을 KMS로 안전하게 암호화하려면?

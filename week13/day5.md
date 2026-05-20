@@ -384,6 +384,99 @@ D) RDS로 서비스 간 데이터 공유
 
 ---
 
+## 🧠 시험 직전 30초 체크리스트 - 절대 잊지 말 것
+
+### 숫자 외우기 (시험에서 매우 자주)
+
+```
+Lambda     메모리 10240MB · 타임아웃 15분 · /tmp 10GB · Layer 5개 · ZIP 250MB · 컨테이너 10GB
+           동시성 1000 (기본) · 비동기 재시도 2회 · 동기 payload 6MB · 비동기 256KB · 스트리밍 20MB
+DynamoDB   항목 400KB · 트랜잭션 100개·4MB · LSI 5개·생성시만 · GSI 20개·언제든
+           Streams 24h · Burst 5분 · 파티션당 3000 RCU + 1000 WCU
+S3         객체 5TB · 단일 PUT 5GB · 멀티파트 파트 5MB~5GB · 파트수 10000
+           Glacier 최소 90일 · Deep Archive 180일 · IA 30일 · IA 객체 최소 128KB
+SQS        메시지 256KB · 보존 1m~14d · VT 0~12h · FIFO 300/s (고처리량 70k)
+Kinesis    샤드 쓰기 1MB/s·1000 RPS · 읽기 2MB/s · 보존 24h~365d · On-Demand 200MB/s
+EC2        UserData 16KB · Spot 2분 알림 · SG 60 규칙 · 1 인스턴스 5 SG
+STS        AssumeRole 1h~12h · 체인 1h · GetSessionToken 36h
+RDS        IAM 토큰 15분 · 자동 백업 35일 · Read Replica 5 (Aurora 15)
+Aurora     3 AZ × 6 사본 · Backtrack 72시간 · Global RTO 1분/RPO 1초
+API GW     캐시 0.5~237GB · TTL 300초 · 429 스로틀 · WebSocket idle 10분·max 2h
+KMS        Encrypt 4KB · CMK $1/월 · 자동 회전 1년 (2022~)
+DVA-C02    65문제 · 130분 · 720/1000 · $150
+```
+
+### 자주 헷갈리는 짝 (한 줄 정리)
+
+```
+Multi-AZ ≠ Read Replica          → HA(동기) vs 읽기 확장(비동기)
+LSI ≠ GSI                        → 생성 시만·Strong vs 언제든·Eventually
+SQS Standard ≠ FIFO              → 무제한·순서X vs 300/s·순서·dedup
+SNS ≠ EventBridge                → Pub/Sub vs 이벤트 필터·라우팅
+Kinesis ≠ SQS                    → 다중 Consumer·재처리 vs 단일·소비후사라짐
+Lambda Reserved ≠ Provisioned    → 상한 설정·무료 vs 미리 켜둠·유료
+$LATEST ≠ Version                → 변경 가능 vs 불변
+Cognito User Pool ≠ Identity Pool → 인증·JWT vs IAM 임시 자격
+WAF ≠ Shield                     → Layer 7·앱 공격 vs Layer 3-4·DDoS
+KMS Encrypt ≠ GenerateDataKey    → ≤4KB vs Envelope
+Secrets Manager ≠ Parameter Store → 회전·$0.40 vs 무료·계층
+SSE-S3 ≠ SSE-KMS ≠ SSE-C         → AWS 키 vs KMS·감사 vs 고객키·HTTPS
+ECR Basic ≠ Enhanced 스캔        → 무료 CVE vs Inspector·유료
+ECS taskRole ≠ executionRole     → 앱이 사용 vs 에이전트가 사용
+SAM ≠ CDK                        → YAML 매크로 vs 코드
+CFN Stack Policy ≠ Termination Protection → 업데이트 보호 vs 삭제 방지
+DeletionPolicy: Retain ≠ Snapshot → 그대로 vs 스냅샷 생성
+ALB ≠ NLB                        → L7·HTTP·DNS vs L4·TCP·EIP
+EC2 stop ≠ terminate ≠ hibernate → EBS 보존 vs 삭제 vs RAM 보존
+OAI (구) ≠ OAC (신)              → CloudFront → S3 비공개 접근
+```
+
+### 보안 시나리오 정답 6개 (시험 자주)
+
+```
+DDoS L7 방어                      → Shield Advanced
+SQL Injection 방어                → WAF
+DB 비밀번호 자동 교체             → Secrets Manager
+모바일 앱 → S3 직접 접근          → Cognito Identity Pool
+대용량 KMS 암호화                 → Envelope Encryption
+3rd-party AssumeRole 보안         → ExternalId (Confused Deputy)
+```
+
+### 안티 패턴 = 오답
+
+```
+❌ Lambda → Lambda 동기 호출 (직접)
+❌ Lambda /tmp에 민감 데이터 영구 저장
+❌ S3 같은 버킷에 처리 결과 저장 (무한 루프)
+❌ EC2에 액세스 키 하드코딩 (IAM 역할 써야)
+❌ Lambda 환경 변수에 비밀번호 평문
+❌ root 계정으로 일상 작업
+❌ DDB 파티션 키에 date/status (핫 파티션)
+❌ Kinesis 한 레코드 실패 후 무한 재시도 (샤드 블록)
+❌ CloudFormation Prod DB에 DeletionPolicy 없음
+❌ 0.0.0.0/0 SSH 인바운드 허용
+```
+
+---
+
+## 🎉 최종 합격 응원 메시지
+
+3개월 동안 13주 × 5일 × 90분 = **약 100시간**의 학습을 마쳤습니다.
+
+- **이론 학습 ✅** — 모든 주요 서비스 커버
+- **함정 정리 ✅** — 도메인별 빈출 패턴 익힘
+- **모의고사 ✅** — 시험 형식 익숙
+- **시험 직전 압축본 ✅** — 마지막 점검 완료
+
+**합격하시면 다음 단계:**
+- AWS Solutions Architect Associate (SAA-C03)
+- AWS DevOps Engineer Professional (DOP-C02)
+- AWS Security Specialty (SCS-C02)
+
+**Good luck! 화이팅!** 🚀
+
+---
+
 ## 📌 3개월 학습 완료 요약
 
 **완료한 주제:**

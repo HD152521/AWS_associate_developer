@@ -63,6 +63,74 @@ Write-Through: 쓰기 시 캐시도 업데이트
 
 ---
 
+## 🧠 도메인 1·2 추가 - 스토리지·DB 시험 직전 압축
+
+### S3 함정 모음 (자주 출제)
+
+| 함정 | 정답 |
+|------|------|
+| "최대 객체 크기?" | **5 TB** |
+| "단일 PUT 최대?" | **5 GB** |
+| "멀티파트 파트 최소?" | **5 MB** (마지막 제외) |
+| "멀티파트 파트 최대?" | **10,000개** |
+| "버전 관리 비활성화 가능?" | **❌** (Suspended만) |
+| "정적 웹사이트 HTTPS?" | **❌** → CloudFront + ACM |
+| "CloudFront ACM 리전?" | **us-east-1 강제** |
+| "OAI vs OAC?" | OAC 권장 (SSE-KMS·SigV4 지원) |
+| "강력한 일관성 시점?" | **2020년부터 모든 동작** |
+| "Glacier 최소 보존?" | **90일** (Instant Retrieval/Flexible), Deep Archive **180일** |
+| "SSE-S3 헤더?" | `AES256` |
+| "SSE-KMS 헤더?" | `aws:kms` |
+| "Bucket Key 효과?" | KMS 비용 최대 **99% 절감** |
+
+### DynamoDB 함정 모음
+
+| 함정 | 정답 |
+|------|------|
+| "항목 최대 크기?" | **400 KB** |
+| "트랜잭션 최대 항목?" | **100개** (이전 25개), 4MB |
+| "LSI 추가 시점?" | **테이블 생성 시만** |
+| "GSI 일관성?" | **Eventually Consistent만** |
+| "Strong Consistency 1KB?" | **1 RCU** |
+| "Eventually 1KB?" | **0.5 RCU** |
+| "Transaction Write 1KB?" | **2 WCU** |
+| "Streams 보존?" | **24시간** (고정) |
+| "Kinesis for DDB 보존?" | 최대 **1년** |
+| "DAX 용도?" | DDB **마이크로초** 캐시 (VPC 내부) |
+| "MemoryDB vs ElastiCache Redis?" | Strong consistent vs Eventually |
+| "Atomic Counter 멱등성?" | ❌ — 중복 위험 |
+| "TTL 만료 후 삭제 시간?" | 0~48시간 |
+| "PartiQL?" | DDB의 SQL 호환 쿼리 |
+
+### RDS·Aurora 함정
+
+| 함정 | 정답 |
+|------|------|
+| "Multi-AZ Standby 읽기?" | **불가** (Cluster Deployment는 가능) |
+| "Read Replica 최대?" | RDS 5 / Aurora **15** |
+| "기존 RDS 암호화 변경?" | 스냅샷 → 암호화 복사 → 새 DB |
+| "Aurora 사본?" | **3 AZ × 2 = 6** |
+| "Aurora 쓰기 정족수?" | **4/6** |
+| "Aurora Replica Failover?" | **< 30초** |
+| "Aurora Global Replication?" | **< 1초**, RTO < 1분 |
+| "Aurora Backtrack?" | MySQL only, 72시간 in-place |
+| "RDS Proxy 효과?" | 연결 풀링·Lambda·Failover 66% ↓ |
+| "IAM 토큰?" | **15분** + SSL 필수 |
+| "Auto 백업 최대?" | **35일** + DB 삭제 시 함께 삭제 |
+| "수동 스냅샷?" | 무기한·DB 삭제 후 유지 |
+
+### Redis vs Memcached 한 줄 결정
+
+| 필요 | 선택 |
+|------|------|
+| 영속성 | **Redis** |
+| Multi-AZ HA | **Redis** |
+| 복잡한 자료구조 | **Redis** |
+| Sorted Set (리더보드) | **Redis** |
+| 멀티스레드 단순 캐시 | **Memcached** |
+
+---
+
 ## 📝 최종 모의고사 - Part 2
 
 **문제 1.** DynamoDB에서 5KB 항목을 강력한 일관성으로 읽을 때 RCU는?

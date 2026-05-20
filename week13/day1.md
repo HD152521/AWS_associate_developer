@@ -62,6 +62,68 @@ WebSocket: $connect, $disconnect, $default
 
 ---
 
+## 🧠 도메인 1 (개발 32%) 시험 직전 압축 정리
+
+### 자주 출제되는 함정 - 도메인 1
+
+| 함정 | 정답 |
+|------|------|
+| "Lambda 최대 메모리?" | **10,240 MB** |
+| "Lambda 최대 타임아웃?" | **15분 (900초)** |
+| "Lambda 컨테이너 이미지 최대?" | **10 GB** |
+| "Lambda Layer 최대 개수?" | **5개** |
+| "ZIP 직접 업로드 최대?" | **50 MB** |
+| "/tmp 최대?" | **10 GB** |
+| "Lambda 동시성 기본 한도?" | **1,000 / 리전** |
+| "비동기 재시도 횟수?" | **2회** (1분, 2분) |
+| "Provisioned Concurrency가 가리키는 것?" | **별칭 또는 버전** ($LATEST 불가) |
+| "SnapStart 지원 런타임?" | **Java, Python, .NET** |
+| "AssumeRole 최대 세션?" | **12시간** |
+| "Role Chaining 최대?" | **1시간** |
+| "STS GetSessionToken 최대?" | **36시간** |
+| "AssumeRole 첫 호출 토큰 만료?" | **1시간 (기본)** |
+
+### IAM 정책 평가 정확히 (시험 매우 빈출)
+
+```
+1. 명시적 Deny (어디든) → 거부
+2. SCP (Organizations) → 미허용 시 거부
+3. 리소스 기반 정책 (S3/SQS/Lambda 등) → 허용이면 OK
+4. 자격 증명 정책 (IAM)
+5. 권한 경계 → 범위 안이어야 함
+6. 세션 정책 (AssumeRole 시)
+→ 모두 충족 시 허용
+```
+
+### Lambda 동시성 4종 (정확히)
+
+| 종류 | 단위 | 설정 |
+|------|------|------|
+| **계정 동시성 한도** | 리전 전체 | 기본 1,000 |
+| **버스트 한도** | 즉시 사용 가능 | 500/1000/3000 (리전별) + 분당 +500 |
+| **예약 동시성** | 함수당 상한 | 무료 |
+| **프로비저닝된 동시성** | 버전/별칭 | 시간당 과금 |
+
+### API Gateway 인증 5종 (외워두기)
+
+1. **None** — 공개
+2. **IAM (SigV4)** — AWS 자격증명
+3. **Lambda Authorizer (TOKEN)** — JWT, OAuth 검증
+4. **Lambda Authorizer (REQUEST)** — 다중 헤더 검증
+5. **Cognito User Pool Authorizer** — JWT 자동
+6. **JWT Authorizer (HTTP API 전용)** — OIDC
+
+### EC2 빈출 함정
+
+- AMI는 **리전 종속**
+- EBS는 **AZ 종속**
+- HDD(st1/sc1) 부팅 볼륨 **불가**
+- 인스턴스 스토어는 **stop/terminate 시 소멸** (reboot은 유지)
+- IMDSv2 토큰 방식 강제 권장
+- SG = Stateful, NACL = Stateless
+
+---
+
 ## 📝 최종 모의고사 - Part 1
 
 **문제 1.** Lambda에서 Provisioned Concurrency가 해결하는 문제는?
